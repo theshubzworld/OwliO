@@ -1,0 +1,6 @@
+-r requirements-core.txt
+transformers==5.5.3
+accelerate>=0.26,<2
+safetensors>=0.4,<1
+sentencepiece>=0.1.99,<1
+soundfile>=0.12,<1

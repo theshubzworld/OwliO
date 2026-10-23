@@ -1,0 +1,6 @@
+project_id = "owlio"
+
+# Usage is anonymous and independent of account sessions. The function applies
+# strict validation, per-install credentials and database rate limits itself.
+[functions.usage-events]
+verify_jwt = false

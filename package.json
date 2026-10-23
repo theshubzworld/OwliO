@@ -1,0 +1,106 @@
+{
+  "name": "owlio",
+  "productName": "Owlio",
+  "version": "1.0.17",
+  "description": "Ultra-fast, context-aware AI voice dictation for Windows",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build:helper": "cd windows-helper && dotnet publish -c Release -r win-x64 --self-contained true -o bin/Release/net8.0-windows/publish",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
+    "build": "npm run typecheck && npm run build:helper && npm run build:renderer && npm run build:main",
+    "start": "electron dist/main/main.js",
+    "server": "python scripts/run_server.py",
+    "server:install": "python -m pip install -r requirements.txt",
+    "package": "node scripts/package_windows.cjs",
+    "dev": "npm run build:helper && tsc -p tsconfig.main.json && vite build && electron dist/main/main.js"
+  },
+  "keywords": [
+    "dictation",
+    "whisper",
+    "voice",
+    "ai",
+    "windows"
+  ],
+  "author": "Owlio",
+  "license": "MIT",
+  "build": {
+    "appId": "com.owlio.desktop",
+    "productName": "Owlio",
+    "directories": {
+      "output": "release-artifacts"
+    },
+    "files": [
+      "dist/main/**/*",
+      "dist/preload/**/*",
+      "dist/renderer/**/*",
+      "dist/shared/**/*",
+      "cloud-config.json",
+      "assets/brand/owlio-icon.png",
+      "assets/brand/owlio.ico",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "windows-helper/bin/Release/net8.0-windows/publish",
+        "to": "windows-helper"
+      },
+      {
+        "from": ".",
+        "to": "speech",
+        "filter": [
+          "server.py",
+          "model_manager.py",
+          "huggingface_models.py",
+          "transformers_whisper.py",
+          "flex_backend.py",
+          "cuda_runtime.py",
+          "setup_runtime.py",
+          "requirements*.txt",
+          "vendor/**/*.py",
+          "vendor/**/*.md"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/brand/owlio.ico",
+      "artifactName": "Owlio-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "include": "scripts/installer.nsh",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Owlio",
+      "runAfterFinish": false
+    }
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.11",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "lucide-react": "^1.56.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0"
+  }
+}
