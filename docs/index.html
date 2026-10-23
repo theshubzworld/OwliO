@@ -4,8 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#fcfaf7">
-  <meta name="description" content="Meet Owlio — the ultra-fast Windows AI voice typing companion supporting 100+ languages worldwide. Whisper on-device speech, 27 regional Indic dialects, and bilingual Hinglish.">
-  <title>Owlio — Ultra-Fast AI Voice Typing for Windows</title>
+  <meta name="description" content="Owlio is a free Windows voice typing companion. Speak naturally in any text field and get polished text, on-device with local Whisper, in 100+ languages including Hinglish.">
+  <title>Owlio — Voice Typing for Windows</title>
+
+  <!-- Social previews -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Owlio — Voice Typing for Windows">
+  <meta property="og:description" content="Speak naturally in any text field on Windows. Local Whisper, works offline, 100+ languages including Hinglish.">
+  <meta property="og:image" content="assets/owlio-logo.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Owlio — Voice Typing for Windows">
+  <meta name="twitter:description" content="Speak naturally in any text field on Windows. Local Whisper, works offline, 100+ languages including Hinglish.">
+  <meta name="twitter:image" content="assets/owlio-logo.png">
+
   <link rel="icon" href="assets/owlio-icon-128.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,24 +25,21 @@
     :root {
       color-scheme: light;
       --bg: #fcfaf7;
-      --card-bg: rgba(255, 255, 255, 0.85);
-      --card-border: rgba(226, 216, 206, 0.7);
+      --card-bg: rgba(255, 255, 255, 0.88);
+      --card-border: rgba(226, 216, 206, 0.8);
       --ink: #2d1825;
       --ink-soft: #4b3644;
-      --muted: #786675;
+      --muted: #6f5d6c;
       --plum: #682d49;
       --plum-hover: #532038;
       --plum-glow: rgba(104, 45, 73, 0.18);
       --peach: #f59e6c;
       --peach-soft: #fff3ec;
-      --amber: #d97706;
       --green: #15803d;
-      --green-soft: #f0fdf4;
       --line: #ede5dd;
-      --font-display: 'Outfit', sans-serif;
+      --font-display: 'Outfit', system-ui, sans-serif;
       --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-      --radius-sm: 10px;
+      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
       --radius-md: 18px;
       --radius-lg: 28px;
       --shadow-sm: 0 4px 12px rgba(67, 37, 54, 0.04);
@@ -40,826 +48,348 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; scroll-padding-top: 88px; }
     body {
       background: var(--bg);
       color: var(--ink);
       font-family: var(--font-body);
       line-height: 1.6;
       overflow-x: hidden;
-      position: relative;
     }
-
-    /* Ambient Background Mesh */
     body::before {
       content: "";
       position: fixed;
       top: -20%;
       left: 50%;
       transform: translateX(-50%);
-      width: 1200px;
+      width: min(1200px, 100vw);
       height: 700px;
       background: radial-gradient(circle at 50% 30%, rgba(245, 158, 108, 0.15), rgba(104, 45, 73, 0.08) 45%, transparent 70%);
       pointer-events: none;
       z-index: -1;
       filter: blur(60px);
     }
-
     a { color: inherit; text-decoration: none; }
     img { max-width: 100%; height: auto; }
     .wrap { width: min(1140px, calc(100% - 40px)); margin-inline: auto; }
+    :focus-visible { outline: 3px solid var(--peach); outline-offset: 3px; border-radius: 6px; }
+    .skip {
+      position: absolute; left: -999px; top: 8px; z-index: 200;
+      background: var(--plum); color: #fff; padding: 10px 16px; border-radius: 10px;
+    }
+    .skip:focus { left: 12px; }
 
-    /* Sticky Navbar */
+    /* Navbar */
     .topbar-wrapper {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      background: rgba(252, 250, 247, 0.82);
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      background: rgba(252, 250, 247, 0.85);
       border-bottom: 1px solid rgba(237, 229, 221, 0.7);
     }
-    .topbar {
-      height: 72px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-    }
+    .topbar { height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
     .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 1.35rem;
-      letter-spacing: -0.02em;
-      color: var(--ink);
+      display: flex; align-items: center; gap: 12px;
+      font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; letter-spacing: -0.02em;
     }
-    .brand img {
-      width: 38px;
-      height: 38px;
+    .brand img { width: 36px; height: 36px; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .brand:hover img { transform: rotate(-8deg) scale(1.08); }
+    .brand-tag {
+      font-size: 0.72rem; font-weight: 600; font-family: var(--font-mono);
+      background: var(--peach-soft); color: var(--plum);
+      padding: 3px 8px; border-radius: 99px; border: 1px solid rgba(245, 158, 108, 0.35);
+    }
+    .nav { display: flex; align-items: center; gap: 26px; }
+    .nav a { color: var(--muted); font-weight: 500; font-size: 0.92rem; transition: color 0.15s ease; }
+    .nav a:hover { color: var(--plum); }
+    .nav .nav-cta {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid #dcd1c8; background: #fff; border-radius: 99px;
+      color: var(--ink); padding: 7px 16px; font-weight: 600; box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+    }
+    .nav .nav-cta:hover { border-color: var(--plum); color: var(--plum); transform: translateY(-1px); }
+    .stars { font-family: var(--font-mono); font-size: 0.78rem; color: var(--plum); display: none; }
+    .stars.on { display: inline; }
+
+    /* Hero */
+    .hero-section { padding: 56px 0 40px; text-align: center; }
+    .hero-brand-intro { text-align: center; margin-bottom: 14px; }
+    .hero-logo-box { display: flex; justify-content: center; align-items: center; margin: 0 auto 16px; }
+    .hero-logo {
+      width: min(280px, 72%); height: auto; display: block; margin: 0 auto;
+      filter: drop-shadow(0 6px 16px rgba(104, 45, 73, 0.08));
       transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-    .brand:hover img {
-      transform: rotate(-8deg) scale(1.08);
-    }
-    .brand-tag {
-      font-size: 0.72rem;
-      font-weight: 600;
-      font-family: var(--font-mono);
-      background: var(--peach-soft);
-      color: var(--plum);
-      padding: 3px 8px;
-      border-radius: 99px;
-      border: 1px solid rgba(245, 158, 108, 0.35);
-    }
-    .nav {
-      display: flex;
-      align-items: center;
-      gap: 28px;
-    }
-    .nav a {
-      color: var(--muted);
-      font-weight: 500;
-      font-size: 0.92rem;
-      transition: color 0.15s ease;
-    }
-    .nav a:hover { color: var(--plum); }
-    .nav-cta {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      border: 1px solid #dcd1c8;
-      background: #fff;
-      border-radius: 99px;
-      color: var(--ink) !important;
-      padding: 8px 18px;
-      font-weight: 600;
-      box-shadow: var(--shadow-sm);
-      transition: all 0.2s ease !important;
-    }
-    .nav-cta:hover {
-      border-color: var(--plum);
-      color: var(--plum) !important;
-      transform: translateY(-1px);
-    }
+    .hero-logo:hover { transform: scale(1.03); }
 
-    /* Hero Section */
-    .hero-section {
-      padding: 56px 0 40px;
-      text-align: center;
-    }
-    .badge-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 14px;
-      border-radius: 99px;
-      background: #ffffff;
-      border: 1px solid rgba(226, 216, 206, 0.9);
-      box-shadow: 0 4px 14px rgba(67, 37, 54, 0.04);
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--plum);
-      margin-bottom: 24px;
-    }
-    .badge-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--peach);
-      box-shadow: 0 0 0 3px rgba(245, 158, 108, 0.25);
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.2); opacity: 0.7; }
-    }
     .hero-title {
       font-family: var(--font-display);
-      font-size: clamp(2.1rem, 4.2vw, 3.2rem);
-      font-weight: 600;
-      line-height: 1.2;
-      letter-spacing: -0.025em;
-      color: #352130;
-      max-width: 780px;
-      margin: 0 auto 16px;
+      font-size: clamp(2.1rem, 5.2vw, 3.4rem);
+      font-weight: 700; line-height: 1.15; letter-spacing: -0.03em;
+      color: #2d1825; max-width: 820px; margin: 0 auto 18px;
     }
     .hero-title span {
-      font-weight: 500;
-      font-size: clamp(1.8rem, 3.6vw, 2.7rem);
-      background: linear-gradient(135deg, #743252 0%, #a4385a 50%, #d97746 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      background: linear-gradient(135deg, #7a2a50 0%, #a12a55 50%, #b4501c 100%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
     }
     .hero-lead {
-      max-width: 580px;
-      margin: 0 auto 28px;
-      font-size: 1.05rem;
-      font-weight: 400;
-      color: #63505e;
-      line-height: 1.65;
+      max-width: 580px; margin: 0 auto 28px; font-size: 1.08rem; color: #574452; line-height: 1.65;
     }
-    .hero-actions {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 14px;
-      margin-bottom: 28px;
-    }
+    .hero-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
     .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      min-height: 52px;
-      padding: 12px 26px;
-      border-radius: 14px;
-      font-family: var(--font-body);
-      font-weight: 600;
-      font-size: 0.98rem;
-      text-decoration: none;
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      min-height: 52px; padding: 12px 28px; border-radius: 999px;
+      font-family: var(--font-body); font-weight: 600; font-size: 0.98rem; cursor: pointer;
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
     }
     .btn-primary {
-      background: linear-gradient(135deg, var(--plum) 0%, #7d3356 100%);
+      background: linear-gradient(135deg, rgba(104, 45, 73, 0.92) 0%, rgba(125, 51, 86, 0.88) 100%);
       color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      box-shadow: 0 10px 24px var(--plum-glow);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      box-shadow: 0 10px 26px var(--plum-glow), inset 0 1px 1.5px rgba(255, 255, 255, 0.5), inset 0 -1px 2px rgba(0, 0, 0, 0.12);
     }
     .btn-primary:hover {
-      background: linear-gradient(135deg, var(--plum-hover) 0%, #682645 100%);
+      background: linear-gradient(135deg, rgba(118, 48, 81, 0.96) 0%, rgba(140, 58, 96, 0.92) 100%);
       transform: translateY(-2px);
-      box-shadow: 0 14px 30px rgba(104, 45, 73, 0.28);
+      border-color: rgba(255, 255, 255, 0.6);
+      box-shadow: 0 14px 32px rgba(104, 45, 73, 0.32), inset 0 1px 2px rgba(255, 255, 255, 0.65);
     }
     .btn-secondary {
-      background: #ffffff;
+      background: rgba(255, 255, 255, 0.68);
       color: var(--ink);
-      border: 1px solid #dcd1c8;
-      box-shadow: var(--shadow-sm);
+      border: 1px solid rgba(226, 216, 206, 0.85);
+      box-shadow: 0 8px 22px rgba(67, 37, 54, 0.05), inset 0 1px 1.5px rgba(255, 255, 255, 0.95);
     }
     .btn-secondary:hover {
-      background: #faf7f4;
-      border-color: #cbbeb4;
+      background: rgba(255, 255, 255, 0.92);
+      border-color: rgba(184, 160, 175, 0.8);
+      color: var(--plum);
       transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(67, 37, 54, 0.09), inset 0 1px 2px rgba(255, 255, 255, 1);
     }
-    .hero-caption {
-      font-size: 0.82rem;
-      color: var(--muted);
-      margin-bottom: 38px;
-    }
-    .hero-caption a { color: var(--plum); font-weight: 600; }
+    .btn:active { transform: translateY(0); }
+    .hero-caption { font-size: 0.85rem; color: var(--muted); margin-bottom: 44px; }
+    .hero-caption a { color: var(--plum); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 
-    /* Interactive Desktop UI Showcase */
-    .mockup-container {
-      position: relative;
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 10px;
-    }
+    /* Demo */
+    .mockup-container { max-width: 900px; margin: 0 auto; padding: 10px; }
     .mockup-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius-lg);
-      padding: 34px 36px;
-      box-shadow: var(--shadow-lg);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      text-align: left;
-      position: relative;
-      overflow: hidden;
-    }
-    .mockup-card::before {
-      content: "";
-      position: absolute;
-      top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+      background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius-lg);
+      padding: 30px 34px; box-shadow: var(--shadow-lg); text-align: left;
     }
     .mockup-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-bottom: 22px; padding-bottom: 14px; border-bottom: 1px solid var(--line);
     }
-    .mockup-dots {
-      display: flex;
-      gap: 7px;
-    }
-    .mockup-dots span {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #e2d7ce;
-    }
+    .mockup-dots { display: flex; gap: 7px; }
+    .mockup-dots span { width: 10px; height: 10px; border-radius: 50%; background: #e2d7ce; }
     .mockup-dots span:nth-child(1) { background: #fca5a5; }
     .mockup-dots span:nth-child(2) { background: #fcd34d; }
     .mockup-dots span:nth-child(3) { background: #86efac; }
-    .mockup-title {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--muted);
-      font-family: var(--font-mono);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+    .mockup-title { font-size: 0.78rem; font-weight: 600; color: var(--muted); font-family: var(--font-mono); }
 
-    /* Floating Pill Overlay Demo */
     .pill-overlay-demo {
-      background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(254,251,248,0.95));
-      border: 1px solid #dfd3c8;
-      border-radius: 99px;
-      padding: 12px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      box-shadow: 0 16px 36px rgba(67, 37, 54, 0.1);
-      margin-bottom: 22px;
-      max-width: 680px;
-      margin-inline: auto;
+      background: #fff; border: 1px solid #dfd3c8; border-radius: 99px;
+      padding: 10px 22px; display: flex; align-items: center; justify-content: space-between; gap: 18px;
+      box-shadow: 0 16px 36px rgba(67, 37, 54, 0.1); margin: 0 auto 20px; max-width: 640px;
     }
-    .pill-avatar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .pill-avatar img {
-      width: 42px;
-      height: 42px;
-      animation: float 3s ease-in-out infinite;
-    }
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-4px); }
-    }
-    .pill-status {
-      display: flex;
-      flex-direction: column;
-    }
-    .pill-name {
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: var(--ink);
-    }
-    .pill-desc {
-      font-size: 0.76rem;
-      color: var(--green);
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .pill-desc::before {
-      content: "";
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--green);
-    }
-    .wave-bars {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      height: 24px;
-    }
-    .wave-bar {
-      width: 3.5px;
-      background: var(--plum);
-      border-radius: 99px;
-      animation: wave 1.2s ease-in-out infinite;
-    }
+    .pill-avatar { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .pill-avatar img { width: 40px; height: 40px; animation: float 3s ease-in-out infinite; flex-shrink: 0; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+    .pill-status { display: flex; flex-direction: column; line-height: 1.3; }
+    .pill-name { font-weight: 700; font-size: 0.93rem; }
+    .pill-desc { font-size: 0.76rem; color: var(--green); font-weight: 600; display: flex; align-items: center; gap: 5px; }
+    .pill-desc::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .wave-bars { display: flex; align-items: center; gap: 4px; height: 24px; }
+    .wave-bar { width: 3.5px; background: var(--plum); border-radius: 99px; animation: wave 1.2s ease-in-out infinite; }
     .wave-bar:nth-child(1) { height: 8px; animation-delay: 0.1s; }
     .wave-bar:nth-child(2) { height: 18px; animation-delay: 0.3s; }
     .wave-bar:nth-child(3) { height: 24px; animation-delay: 0.2s; }
     .wave-bar:nth-child(4) { height: 14px; animation-delay: 0.4s; }
     .wave-bar:nth-child(5) { height: 20px; animation-delay: 0.15s; }
     .wave-bar:nth-child(6) { height: 9px; animation-delay: 0.35s; }
-    @keyframes wave {
-      0%, 100% { transform: scaleY(0.4); }
-      50% { transform: scaleY(1); }
-    }
+    @keyframes wave { 0%, 100% { transform: scaleY(0.4); } 50% { transform: scaleY(1); } }
     .pill-shortcut {
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      padding: 5px 10px;
-      background: #f1eae2;
-      border-radius: 8px;
-      color: var(--plum);
-      font-weight: 600;
-      border: 1px solid #e5dacf;
+      font-family: var(--font-mono); font-size: 0.78rem; padding: 5px 10px;
+      background: #f1eae2; border-radius: 8px; color: var(--plum); font-weight: 600; border: 1px solid #e5dacf;
+      white-space: nowrap;
     }
 
-    /* Live Output Stream Area */
+    .stream-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .lang-chip {
+      font-family: var(--font-mono); font-size: 0.74rem; font-weight: 600;
+      color: #9a4a12; background: var(--peach-soft); border: 1px solid rgba(245, 158, 108, 0.45);
+      padding: 3px 10px; border-radius: 99px;
+    }
+    .stream-app { font-size: 0.76rem; color: var(--muted); font-family: var(--font-mono); }
     .mockup-stream {
-      background: #ffffff;
-      border: 1px solid #e7ded4;
-      border-radius: var(--radius-md);
-      padding: 24px 28px;
-      font-size: 1.05rem;
-      line-height: 1.7;
-      color: var(--ink);
+      background: #fff; border: 1px solid #e7ded4; border-radius: var(--radius-md);
+      padding: 22px 26px; font-size: 1.1rem; line-height: 1.7; min-height: 6.4em;
       box-shadow: inset 0 2px 6px rgba(0,0,0,0.02);
     }
-    .mockup-stream mark {
-      background: rgba(245, 158, 108, 0.25);
-      color: var(--ink);
-      padding: 2px 4px;
-      border-radius: 4px;
-    }
     .typing-cursor {
-      display: inline-block;
-      width: 2px;
-      height: 1.2em;
-      background: var(--plum);
-      vertical-align: middle;
-      animation: blink 0.9s infinite;
+      display: inline-block; width: 2px; height: 1.15em; background: var(--plum);
+      vertical-align: text-bottom; margin-left: 2px; animation: blink 0.9s infinite;
     }
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .mockup-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+    .mockup-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .mockup-pill { font-size: 0.78rem; font-weight: 600; color: var(--ink-soft); background: #f5eee7; padding: 5px 12px; border-radius: 99px; }
+    .mockup-os { font-size: 0.78rem; color: var(--muted); font-family: var(--font-mono); }
 
-    /* Feature Chips Bar */
-    .mockup-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 18px;
-    }
-    .mockup-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: var(--ink-soft);
-      background: #f5eee7;
-      padding: 5px 12px;
-      border-radius: 99px;
-    }
+    /* Sections */
+    section { padding: 84px 0; }
+    .section-head { max-width: 720px; margin: 0 auto 44px; text-align: center; }
+    .section-eyebrow { font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; color: var(--plum); margin-bottom: 12px; }
+    .section-title { font-family: var(--font-display); font-size: clamp(1.9rem, 5vw, 3rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; }
+    .section-subtitle { margin-top: 14px; color: var(--muted); font-size: 1.08rem; }
 
-    /* Section Headers */
-    section { padding: 90px 0; }
-    .section-head {
-      max-width: 720px;
-      margin: 0 auto 46px;
-      text-align: center;
-    }
-    .section-eyebrow {
-      font-size: 0.76rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.2em;
-      color: var(--plum);
-      margin-bottom: 12px;
-    }
-    .section-title {
-      font-family: var(--font-display);
-      font-size: clamp(2.2rem, 5vw, 3.2rem);
-      font-weight: 750;
-      letter-spacing: -0.035em;
-      color: var(--ink);
-      line-height: 1.15;
-    }
-    .section-subtitle {
-      margin-top: 14px;
-      color: var(--muted);
-      font-size: 1.1rem;
-    }
-
-    /* Bento Grid Features */
-    .bento-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-    }
+    /* Bento */
+    .bento-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
     .bento-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius-md);
-      padding: 32px 28px;
-      box-shadow: var(--shadow-sm);
+      background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius-md);
+      padding: 30px 28px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column;
       transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      display: flex;
-      flex-direction: column;
     }
-    .bento-card:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-md);
-      border-color: #d8c7bb;
-    }
+    .bento-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: #d8c7bb; }
+    .bento-card.wide { grid-column: span 2; background: linear-gradient(135deg, #fff 0%, #fff6f0 100%); }
     .bento-icon {
-      width: 48px;
-      height: 48px;
-      display: grid;
-      place-items: center;
-      border-radius: 14px;
-      background: #f6ede9;
-      color: var(--plum);
-      font-size: 1.4rem;
-      margin-bottom: 20px;
+      width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px;
+      background: #f6ede9; color: var(--plum); margin-bottom: 18px;
     }
-    .bento-card h3 {
-      font-family: var(--font-display);
-      font-size: 1.25rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 10px;
-      color: var(--ink);
-    }
-    .bento-card p {
-      color: var(--muted);
-      font-size: 0.95rem;
-      line-height: 1.6;
-    }
+    .bento-icon svg { width: 24px; height: 24px; }
+    .bento-card h3 { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .bento-card p { color: var(--muted); font-size: 0.95rem; line-height: 1.6; }
+    .bento-card.wide h3 { font-size: 1.45rem; }
+    .bento-card.wide p { font-size: 1rem; max-width: 520px; }
+    .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+    .chip-row span { font-size: 0.78rem; font-weight: 600; color: #725e6e; background: #f4ecf1; padding: 4px 11px; border-radius: 99px; }
 
-    /* Dedicated 100+ Languages Showcase Section */
-    .languages-section {
-      background: linear-gradient(180deg, transparent 0%, #f4ede6 50%, transparent 100%);
-      padding: 100px 0;
-    }
-    .lang-showcase {
-      display: grid;
-      grid-template-columns: 1.05fr 0.95fr;
-      gap: 48px;
-      align-items: center;
-    }
-    .lang-content h2 {
-      font-family: var(--font-display);
-      font-size: clamp(2.3rem, 5vw, 3.2rem);
-      font-weight: 800;
-      line-height: 1.15;
-      letter-spacing: -0.03em;
-      color: var(--ink);
-      margin-bottom: 18px;
-    }
-    .lang-content p {
-      color: var(--ink-soft);
-      font-size: 1.05rem;
-      margin-bottom: 16px;
-      line-height: 1.65;
-    }
-    .lang-highlights {
-      display: grid;
-      gap: 14px;
-      margin-top: 24px;
-    }
+    /* Languages */
+    .languages-section { background: linear-gradient(180deg, transparent 0%, #f4ede6 50%, transparent 100%); padding: 96px 0; }
+    .lang-showcase { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; }
+    .lang-content h2 { font-family: var(--font-display); font-size: clamp(2rem, 5vw, 3rem); font-weight: 700; line-height: 1.15; letter-spacing: -0.03em; margin-bottom: 18px; }
+    .lang-content > p { color: var(--ink-soft); font-size: 1.05rem; line-height: 1.65; }
+    .lang-highlights { display: grid; gap: 14px; margin-top: 24px; }
     .lang-highlight-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 14px;
-      background: rgba(255, 255, 255, 0.7);
-      border: 1px solid rgba(226, 216, 206, 0.8);
-      border-radius: 14px;
-      padding: 14px 18px;
+      display: flex; align-items: flex-start; gap: 14px;
+      background: rgba(255, 255, 255, 0.75); border: 1px solid rgba(226, 216, 206, 0.8);
+      border-radius: 14px; padding: 14px 18px;
     }
     .lang-highlight-badge {
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 0.85rem;
-      background: var(--plum);
-      color: #fff;
-      padding: 4px 10px;
-      border-radius: 8px;
-      flex-shrink: 0;
+      font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem;
+      background: var(--plum); color: #fff; padding: 4px 10px; border-radius: 8px; flex-shrink: 0; min-width: 52px; text-align: center;
     }
-    .lang-highlight-text strong {
-      display: block;
-      color: var(--ink);
-      font-size: 0.96rem;
-      margin-bottom: 3px;
-    }
-    .lang-highlight-text span {
-      font-size: 0.88rem;
-      color: var(--muted);
-      line-height: 1.5;
-    }
+    .lang-highlight-text strong { display: block; font-size: 0.96rem; margin-bottom: 3px; }
+    .lang-highlight-text span { font-size: 0.88rem; color: var(--muted); line-height: 1.5; }
+    .fine-print { margin-top: 18px; font-size: 0.84rem; color: var(--muted); }
 
-    /* Interactive Language Box */
-    .lang-box {
-      background: #ffffff;
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius-lg);
-      padding: 34px;
-      box-shadow: var(--shadow-lg);
-    }
-    .lang-stats-bar {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-bottom: 22px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid var(--line);
-      text-align: center;
-    }
-    .lang-stat-block {
-      background: #fbf8f5;
-      padding: 10px 8px;
-      border-radius: 14px;
-      border: 1px solid #f0e6dc;
-    }
-    .lang-stat-value {
-      font-family: var(--font-display);
-      font-size: 1.6rem;
-      font-weight: 800;
-      color: var(--plum);
-      display: block;
-      line-height: 1.2;
-    }
-    .lang-stat-caption {
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--muted);
-    }
-    .tag-cloud-title {
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: var(--ink-soft);
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .tag-cloud {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-      margin-bottom: 22px;
-    }
-    .lang-tag {
-      font-size: 0.8rem;
-      font-weight: 600;
-      padding: 5px 11px;
-      border-radius: 99px;
-      background: #f7f2ed;
-      border: 1px solid #e7ded4;
-      color: #554150;
-      transition: all 0.15s ease;
-    }
-    .lang-tag.highlight {
-      background: var(--peach-soft);
-      border-color: rgba(245, 158, 108, 0.4);
-      color: #b45309;
-    }
-    .lang-tag:hover {
-      background: #fff;
-      border-color: var(--plum);
-      color: var(--plum);
-      transform: translateY(-1px);
-    }
+    .lang-box { background: #fff; border: 1px solid var(--card-border); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow-lg); }
+    .tag-cloud-title { font-size: 0.82rem; font-weight: 700; color: var(--ink-soft); margin-bottom: 10px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .tag-cloud { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 22px; }
+    .lang-tag { font-size: 0.8rem; font-weight: 600; padding: 5px 11px; border-radius: 99px; background: #f7f2ed; border: 1px solid #e7ded4; color: #554150; }
+    .lang-tag.highlight { background: var(--peach-soft); border-color: rgba(245, 158, 108, 0.45); color: #9a4a12; }
+    .script-demo-box { background: #faf6f1; border: 1px solid #ebdcd0; border-radius: var(--radius-md); padding: 16px 20px; }
+    .script-demo-head { display: flex; justify-content: space-between; gap: 8px; font-size: 0.74rem; font-weight: 700; color: var(--plum); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
+    .script-bubble { padding: 10px 14px; border-radius: 10px; background: #fff; border: 1px solid #e8ddd2; font-size: 0.92rem; margin-bottom: 8px; }
+    .script-bubble small { display: block; color: var(--muted); font-size: 0.76rem; }
+    .script-bubble.result { background: #f4eaee; border-color: #dec9d3; color: var(--plum); font-weight: 600; margin-bottom: 0; }
+    .script-bubble.result small { color: var(--plum); font-weight: 500; }
 
-    /* Romanization Interactive Card */
-    .script-demo-box {
-      background: #faf6f1;
-      border: 1px solid #ebdcd0;
-      border-radius: var(--radius-md);
-      padding: 16px 20px;
-    }
-    .script-demo-head {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.76rem;
-      font-weight: 700;
-      color: var(--plum);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      margin-bottom: 10px;
-    }
-    .script-bubble {
-      padding: 10px 14px;
-      border-radius: 10px;
-      background: #fff;
-      border: 1px solid #e8ddd2;
-      font-size: 0.92rem;
-      margin-bottom: 8px;
-      color: var(--ink);
-    }
-    .script-bubble.result {
-      background: #f4eaee;
-      border-color: #dec9d3;
-      color: var(--plum);
-      font-weight: 600;
-    }
+    /* Privacy */
+    .privacy-section { background: #eef3ed; border-top: 1px solid #dce5db; border-bottom: 1px solid #dce5db; }
+    .privacy-wrap { display: grid; grid-template-columns: 0.95fr 1.05fr; gap: 50px; align-items: center; }
+    .privacy-wrap .lead { margin: 16px 0 24px; color: #435a47; font-size: 1.05rem; line-height: 1.6; }
+    .privacy-links { display: flex; gap: 10px; flex-wrap: wrap; }
+    .privacy-links .btn { border-color: #b9ccb9; }
+    .privacy-list { list-style: none; display: grid; gap: 14px; }
+    .privacy-item { background: rgba(255, 255, 255, 0.88); border: 1px solid #d4dfd4; border-radius: var(--radius-md); padding: 18px 22px; box-shadow: 0 4px 14px rgba(45, 75, 52, 0.04); }
+    .privacy-item strong { display: block; color: #1f3b25; font-size: 1.02rem; margin-bottom: 4px; }
+    .privacy-item span { font-size: 0.9rem; color: #4b6250; line-height: 1.55; }
 
-    /* Privacy Architecture Section */
-    .privacy-section {
-      background: #eef3ed;
-      border-top: 1px solid #dce5db;
-      border-bottom: 1px solid #dce5db;
-    }
-    .privacy-wrap {
-      display: grid;
-      grid-template-columns: 0.95fr 1.05fr;
-      gap: 50px;
-      align-items: center;
-    }
-    .privacy-list {
-      list-style: none;
-      display: grid;
-      gap: 14px;
-    }
-    .privacy-item {
-      background: rgba(255, 255, 255, 0.85);
-      border: 1px solid #d4dfd4;
-      border-radius: var(--radius-md);
-      padding: 18px 22px;
-      box-shadow: 0 4px 14px rgba(45, 75, 52, 0.04);
-    }
-    .privacy-item strong {
-      display: block;
-      color: #1f3b25;
-      font-size: 1.02rem;
-      margin-bottom: 4px;
-    }
-    .privacy-item span {
-      font-size: 0.9rem;
-      color: #556c5a;
-      line-height: 1.55;
-    }
-
-    /* Download Box */
+    /* Download */
     .download-card {
-      background: linear-gradient(135deg, #ffffff, #fffaf7);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius-lg);
-      padding: 44px 48px;
-      box-shadow: var(--shadow-lg);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 32px;
+      background: linear-gradient(135deg, #fff, #fffaf7); border: 1px solid var(--card-border);
+      border-radius: var(--radius-lg); padding: 44px 48px; box-shadow: var(--shadow-lg);
+      display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center;
     }
-    .download-info h3 {
-      font-family: var(--font-display);
-      font-size: 1.8rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin-bottom: 8px;
-      color: var(--ink);
-    }
-    .download-info p {
-      color: var(--muted);
-      font-size: 1rem;
-      margin-bottom: 14px;
-    }
-    .meta-tags {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .meta-tag {
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: #725e6e;
-      background: #f4ecf1;
-      padding: 4px 10px;
-      border-radius: 99px;
-    }
+    .download-info h2 { font-family: var(--font-display); font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .download-info p { color: var(--muted); margin-bottom: 16px; }
+    .meta-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+    .meta-tag { font-size: 0.78rem; font-weight: 600; color: #725e6e; background: #f4ecf1; padding: 4px 10px; border-radius: 99px; }
+    .download-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+    .expect-box { background: #faf6f1; border: 1px solid #ebdcd0; border-radius: var(--radius-md); padding: 22px 24px; }
+    .expect-box h3 { font-family: var(--font-display); font-size: 1.05rem; margin-bottom: 12px; }
+    .expect-box ul { list-style: none; display: grid; gap: 10px; }
+    .expect-box li { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.5; padding-left: 22px; position: relative; }
+    .expect-box li::before { content: ""; position: absolute; left: 2px; top: 0.5em; width: 8px; height: 8px; border-radius: 50%; background: var(--peach); }
+    .expect-box a { color: var(--plum); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 
-    /* FAQ Section */
-    .faq-list {
-      max-width: 820px;
-      margin: 0 auto;
-      display: grid;
-      gap: 12px;
-    }
-    .faq-item {
-      background: #ffffff;
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      padding: 18px 24px;
-      transition: all 0.2s ease;
-    }
-    .faq-item[open] {
-      border-color: #d1b8c6;
-      box-shadow: var(--shadow-sm);
-    }
-    .faq-item summary {
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 1.05rem;
-      color: var(--ink);
-      user-select: none;
-    }
-    .faq-item p {
-      margin-top: 12px;
-      color: var(--ink-soft);
-      font-size: 0.95rem;
-      line-height: 1.65;
-    }
+    /* FAQ */
+    .faq-list { max-width: 820px; margin: 0 auto; display: grid; gap: 12px; }
+    .faq-item { background: #fff; border: 1px solid var(--card-border); border-radius: 16px; padding: 18px 24px; transition: all 0.2s ease; }
+    .faq-item[open] { border-color: #d1b8c6; box-shadow: var(--shadow-sm); }
+    .faq-item summary { cursor: pointer; font-weight: 700; font-size: 1.03rem; user-select: none; }
+    .faq-item p { margin-top: 12px; color: var(--ink-soft); font-size: 0.95rem; line-height: 1.65; }
 
     /* Footer */
-    .footer {
-      padding: 50px 0 60px;
-      border-top: 1px solid var(--line);
-    }
-    .footer-content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 20px;
-    }
-    .footer-links {
-      display: flex;
-      gap: 24px;
-      flex-wrap: wrap;
-    }
-    .footer-links a {
-      color: var(--muted);
-      font-size: 0.92rem;
-      font-weight: 500;
-      transition: color 0.15s ease;
-    }
+    .footer { padding: 48px 0 56px; border-top: 1px solid var(--line); }
+    .footer-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+    .footer-brand { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; }
+    .footer-brand img { width: 32px; height: 32px; }
+    .footer-links { display: flex; gap: 22px; flex-wrap: wrap; }
+    .footer-links a { color: var(--muted); font-size: 0.92rem; font-weight: 500; }
     .footer-links a:hover { color: var(--plum); }
-    .copyright {
-      color: var(--muted);
-      font-size: 0.85rem;
-      margin-top: 20px;
-    }
+    .copyright { color: var(--muted); font-size: 0.85rem; margin-top: 20px; }
 
-    /* Responsive Queries */
+    /* Responsive */
     @media (max-width: 900px) {
       .bento-grid { grid-template-columns: repeat(2, 1fr); }
-      .lang-showcase, .privacy-wrap { grid-template-columns: 1fr; gap: 36px; }
-      .download-card { flex-direction: column; align-items: flex-start; padding: 32px 28px; }
+      .bento-card.wide { grid-column: span 2; }
+      .lang-showcase, .privacy-wrap, .download-card { grid-template-columns: 1fr; gap: 32px; }
+      .download-card { padding: 32px 28px; }
     }
     @media (max-width: 600px) {
-      .topbar { height: 65px; }
+      section { padding: 64px 0; }
+      .hero-section { padding-top: 40px; }
       .nav a:not(.nav-cta) { display: none; }
-      .hero-title { font-size: 2.5rem; }
+      .brand-tag { display: none; }
       .bento-grid { grid-template-columns: 1fr; }
-      .mockup-card { padding: 20px 18px; }
-      .pill-overlay-demo { flex-direction: column; align-items: flex-start; gap: 12px; border-radius: 20px; }
-      .footer-content { flex-direction: column; align-items: flex-start; }
+      .bento-card.wide { grid-column: auto; }
+      .mockup-card { padding: 20px 16px; }
+      .mockup-title { display: none; }
+      .pill-overlay-demo { padding: 10px 16px; gap: 10px; }
+      .pill-shortcut, .wave-bars { display: none; }
+      .mockup-stream { padding: 16px 18px; font-size: 1rem; }
+      .hero-actions .btn { width: 100%; }
+      .lang-box { padding: 22px 18px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation: none !important; transition: none !important; }
     }
   </style>
 </head>
 <body>
+  <a class="skip" href="#features">Skip to content</a>
 
-  <!-- Sticky Glassmorphic Navbar -->
   <div class="topbar-wrapper">
     <header class="wrap topbar">
       <a class="brand" href="#home" aria-label="Owlio home">
-        <img src="assets/owlio-icon-128.png" alt="Owlio mascot">
+        <img src="assets/owlio-icon-128.png" alt="">
         <span>Owlio</span>
-        <span class="brand-tag">v1.0.17</span>
+        <span class="brand-tag" id="version-tag">v1.0.17</span>
       </a>
       <nav class="nav" aria-label="Main navigation">
         <a href="#features">Features</a>
-        <a href="#languages">100+ Languages</a>
+        <a href="#languages">Languages</a>
         <a href="#privacy">Privacy</a>
         <a href="#faq">FAQ</a>
         <a class="nav-cta" href="https://github.com/theshubzworld/OwliO">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          View Source
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub <span class="stars" id="stars"></span>
         </a>
       </nav>
     </header>
@@ -867,193 +397,169 @@
 
   <main id="home">
 
-    <!-- Hero Section -->
+    <!-- Hero -->
     <section class="wrap hero-section">
-      <p class="section-eyebrow" style="margin-bottom: 14px; font-size: 0.72rem; letter-spacing: 0.22em; color: #876274;">YOUR LITTLE WRITING COMPANION</p>
-      
-      <div style="margin: 0 auto 18px; text-align: center;">
-        <img class="hero-logo" src="assets/owlio-logo.png" alt="Owlio" style="width: min(280px, 72%); height: auto; display: block; margin: 0 auto;">
+      <div class="hero-brand-intro">
+        <p class="section-eyebrow" style="margin-bottom: 12px; font-size: 0.74rem; letter-spacing: 0.22em; color: var(--plum);">YOUR LITTLE WRITING COMPANION</p>
+        <div class="hero-logo-box">
+          <img class="hero-logo" src="assets/owlio-logo.png" alt="Owlio" width="280" height="86">
+        </div>
       </div>
 
-      <h1 class="hero-title">Your voice. Your words.<br><span>Everywhere on Windows.</span></h1>
-
-      <div class="badge-pill" style="margin-bottom: 22px;">
-        <span class="badge-dot"></span>
-        <span>100+ Languages Supported</span>
-        <span style="opacity: 0.5">·</span>
-        <span>Local Whisper & Indic Flex</span>
-      </div>
-
+      <h1 class="hero-title">Speak naturally. <span>Watch it appear anywhere on Windows.</span></h1>
       <p class="hero-lead">
-        A delightful desktop companion for natural dictation. Speak in any text field across Windows and Owlio turns your voice into polished text across 100+ global languages.
+        A free voice typing companion that works in any text field. Press a shortcut, talk naturally, and get clean text, processed on your own PC.
       </p>
 
       <div class="hero-actions">
         <a class="btn btn-primary" href="https://github.com/theshubzworld/OwliO/releases/latest">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download Owlio for Windows (x64)
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for Windows
         </a>
-        <a class="btn btn-secondary" href="https://github.com/theshubzworld/OwliO">
-          Explore on GitHub
-        </a>
+        <a class="btn btn-secondary" href="#features">See how it works</a>
       </div>
-
       <p class="hero-caption">
-        Free official app · Requires sign-in and acceptance of <a href="legal/terms-of-use.html">Terms of Use</a> & <a href="legal/privacy-notice.html">Privacy Notice</a>.
+        Free · Windows 10 / 11 (x64) · <a href="#download">What to expect before you install</a>
       </p>
 
-      <!-- Interactive Desktop UI Showcase -->
+      <!-- Animated demo -->
       <div class="mockup-container">
         <div class="mockup-card">
           <div class="mockup-header">
-            <div class="mockup-dots"><span></span><span></span><span></span></div>
-            <div class="mockup-title">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-              Desktop Voice Overlay · Supported in Slack, Word, Notion, IDEs & Browsers
-            </div>
+            <div class="mockup-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="mockup-title">Desktop voice overlay · works in Slack, Word, Notion, IDEs &amp; browsers</div>
           </div>
 
-          <!-- Floating Pill Mockup -->
           <div class="pill-overlay-demo">
             <div class="pill-avatar">
-              <img src="assets/owlio-icon-128.png" alt="Owlio icon">
+              <img src="assets/owlio-icon-128.png" alt="">
               <div class="pill-status">
-                <span class="pill-name">Owlio Listening</span>
-                <span class="pill-desc">Local Whisper Engine Active</span>
+                <span class="pill-name">Owlio listening</span>
+                <span class="pill-desc">Local Whisper active</span>
               </div>
             </div>
-            <div class="wave-bars" aria-label="Audio waveform visualizer">
-              <div class="wave-bar"></div>
-              <div class="wave-bar"></div>
-              <div class="wave-bar"></div>
-              <div class="wave-bar"></div>
-              <div class="wave-bar"></div>
-              <div class="wave-bar"></div>
+            <div class="wave-bars" aria-hidden="true">
+              <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+              <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
             </div>
             <div class="pill-shortcut">Win + Space</div>
           </div>
 
-          <!-- Live Output Stream -->
-          <div class="mockup-stream">
-            "Hey team, just drafting the updated release notes for Owlio version 1.0.17.<mark>Transcription latency is lightning-fast on NVIDIA GPU or CPU</mark>, with full offline privacy and zero audio ever leaving the PC."<span class="typing-cursor"></span>
+          <div class="stream-label">
+            <span class="lang-chip" id="demo-lang">English</span>
+            <span class="stream-app">typing into: Slack</span>
+          </div>
+          <div class="mockup-stream" aria-live="off">
+            <span id="demo-text">Hey team, the new release notes are ready. Transcription is fast, even fully offline.</span><span class="typing-cursor" aria-hidden="true"></span>
           </div>
 
           <div class="mockup-footer">
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <span class="mockup-pill">⚡ 100% On-Device AI</span>
-              <span class="mockup-pill">🔒 Zero Audio Uploaded</span>
-              <span class="mockup-pill">🌐 100+ World Languages</span>
+            <div class="mockup-pills">
+              <span class="mockup-pill">On-device AI</span>
+              <span class="mockup-pill">Works offline</span>
+              <span class="mockup-pill">Any app, any text field</span>
             </div>
-            <span style="font-size:0.78rem;color:var(--muted);font-family:var(--font-mono)">Windows 10 / 11 · x64</span>
+            <span class="mockup-os">Windows 10 / 11 · x64</span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Bento Features Section -->
+    <!-- Features -->
     <section id="features" class="wrap">
       <div class="section-head">
-        <p class="section-eyebrow">Engineered for Daily Flow</p>
-        <h2 class="section-title">Everything you need to dictate with confidence</h2>
-        <p class="section-subtitle">A seamless desktop rhythm that lets you keep your hands focused and your thoughts moving.</p>
+        <p class="section-eyebrow">Built for daily flow</p>
+        <h2 class="section-title">Dictate with confidence</h2>
+        <p class="section-subtitle">Keep your hands on your work and let your thoughts move at the speed you speak.</p>
       </div>
 
       <div class="bento-grid">
-        <article class="bento-card">
-          <div class="bento-icon">🎙</div>
-          <h3>System-Wide Windows Integration</h3>
-          <p>Works anywhere you type on Windows. Activate with a customizable shortcut (Win+Space) or via the floating companion across your document editors, browsers, and chats.</p>
+        <article class="bento-card wide">
+          <div class="bento-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>
+          </div>
+          <h3>Runs on your hardware, even offline</h3>
+          <p>Choose lightweight CPU mode or NVIDIA GPU acceleration (CUDA 12.8). Once your model is downloaded, local dictation works without an internet connection, and your audio never has to leave the PC.</p>
+          <div class="chip-row">
+            <span>CPU or NVIDIA GPU</span>
+            <span>Offline after setup</span>
+            <span>Models download on demand</span>
+          </div>
         </article>
 
         <article class="bento-card">
-          <div class="bento-icon">⚡</div>
-          <h3>Local Speech Acceleration</h3>
-          <p>Runs directly on your hardware. Choose Lightweight CPU or full NVIDIA GPU acceleration (CUDA 12.8) so dictation never depends on an internet connection.</p>
+          <div class="bento-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+          </div>
+          <h3>Works in every app</h3>
+          <p>Trigger with a customizable shortcut (default Win+Space) or the floating companion, in editors, browsers, and chat apps.</p>
         </article>
 
         <article class="bento-card">
-          <div class="bento-icon">🌐</div>
-          <h3>100+ Languages & Dialects</h3>
-          <p>Powered by OpenAI Whisper for 100 world languages, supplemented with 27 regional Indic languages through Bodhan Flex, plus intelligent automatic language detection.</p>
+          <div class="bento-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+          </div>
+          <h3>AI polish</h3>
+          <p>Smart punctuation and optional Gemini rewrites turn rambling speech into text you can send as it is.</p>
         </article>
 
         <article class="bento-card">
-          <div class="bento-icon">✍</div>
-          <h3>AI Polish & Roman Hinglish</h3>
-          <p>Smart punctuation, optional Gemini AI rewrites, and Romanization that converts spoken Hindi into clean English-alphabet text automatically.</p>
+          <div class="bento-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/></svg>
+          </div>
+          <h3>Scratchpad &amp; meetings</h3>
+          <p>Capture fleeting ideas, record long meetings in the background, and search your dictation history.</p>
         </article>
 
         <article class="bento-card">
-          <div class="bento-icon">📝</div>
-          <h3>Scratchpad & Meeting Assistant</h3>
-          <p>Quickly capture fleeting ideas in a built-in Scratchpad, record long meetings with background worklets, and organize searchable dictation history.</p>
-        </article>
-
-        <article class="bento-card">
-          <div class="bento-icon">🦉</div>
-          <h3>Customizable Owl Companion</h3>
-          <p>Pick your floating companion style, customize transparency, adapt soundwave feedback, and dial in the perfect microphone configuration.</p>
+          <div class="bento-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="11" r="3"/><circle cx="15.5" cy="11" r="3"/><path d="M5 8l-1-4 4 2M19 8l1-4-4 2M5 11c0 5 3 8 7 8s7-3 7-8"/></svg>
+          </div>
+          <h3>Your owl, your way</h3>
+          <p>Pick a companion style, adjust transparency and soundwave feedback, and tune your microphone setup.</p>
         </article>
       </div>
     </section>
 
-    <!-- Dedicated 100+ Languages Showcase Section -->
+    <!-- Languages -->
     <section id="languages" class="languages-section">
       <div class="wrap lang-showcase">
         <div class="lang-content">
-          <p class="section-eyebrow">Universal Speech Recognition</p>
-          <h2>Over 100 languages supported worldwide</h2>
-          <p>Owlio breaks language barriers on your desktop. Whether you are drafting a contract in English, responding to messages in Spanish, or dictating across Indian regional languages, Owlio listens and writes with high precision.</p>
+          <p class="section-eyebrow">Universal speech recognition</p>
+          <h2>Over 100 languages, including the ones in between</h2>
+          <p>Draft a contract in English, reply in Spanish, or dictate in a regional Indian language. Owlio detects what you speak and writes it in the original script.</p>
 
           <div class="lang-highlights">
             <div class="lang-highlight-item">
               <span class="lang-highlight-badge">100+</span>
               <div class="lang-highlight-text">
-                <strong>Global Multilingual Whisper</strong>
-                <span>Automatic detection across 100 languages including Spanish, French, German, Japanese, Mandarin, Arabic, Russian, Portuguese, Italian, Korean, and Dutch.</span>
+                <strong>Global multilingual Whisper</strong>
+                <span>Automatic detection across languages including Spanish, French, German, Japanese, Mandarin, Arabic, Russian, Portuguese, Italian, Korean, and Dutch.</span>
               </div>
             </div>
-
             <div class="lang-highlight-item">
               <span class="lang-highlight-badge">27</span>
               <div class="lang-highlight-text">
-                <strong>Regional Indic Languages via Bodhan Flex</strong>
-                <span>Native recognition for Bhojpuri, Odia, Maithili, Konkani, Haryanvi, Chhattisgarhi, Marathi, Tamil, Bengali, Telugu, Gujarati, Punjabi, Malayalam, and Kannada.</span>
+                <strong>Regional Indic languages via Bodhan Flex</strong>
+                <span>Including Bhojpuri, Odia, Maithili, Konkani, Haryanvi, Chhattisgarhi, Marathi, Tamil, Bengali, Telugu, Gujarati, Punjabi, Malayalam, and Kannada.</span>
               </div>
             </div>
-
             <div class="lang-highlight-item">
               <span class="lang-highlight-badge">Aa/अ</span>
               <div class="lang-highlight-text">
-                <strong>Bilingual Hinglish & Romanization</strong>
-                <span>Dictate Hindi and English fluidly in the same sentence. Choose original Devanagari script or automatic Gemini conversion to English letters.</span>
+                <strong>Hinglish &amp; romanization</strong>
+                <span>Mix Hindi and English in one sentence. Keep Devanagari, or convert to English letters with Gemini.</span>
               </div>
             </div>
           </div>
+          <p class="fine-print">Accuracy varies by language and by the model size you choose.</p>
         </div>
 
-        <!-- Language Interactive Card -->
         <div class="lang-box">
-          <div class="lang-stats-bar">
-            <div class="lang-stat-block">
-              <span class="lang-stat-value">100+</span>
-              <span class="lang-stat-caption">World Languages</span>
-            </div>
-            <div class="lang-stat-block">
-              <span class="lang-stat-value">27</span>
-              <span class="lang-stat-caption">Indic Dialects</span>
-            </div>
-            <div class="lang-stat-block">
-              <span class="lang-stat-value">Auto</span>
-              <span class="lang-stat-caption">Smart Detect</span>
-            </div>
-          </div>
-
           <div class="tag-cloud-title">
-            <span>Explore Supported Languages</span>
-            <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--plum)">Original Script Preserved</span>
+            <span>A sample of what you can speak</span>
+            <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--plum)">Original script preserved</span>
           </div>
-
           <div class="tag-cloud">
             <span class="lang-tag highlight">English</span>
             <span class="lang-tag">Español</span>
@@ -1078,21 +584,17 @@
             <span class="lang-tag">Polski</span>
             <span class="lang-tag">Türkçe</span>
             <span class="lang-tag">Tiếng Việt</span>
-            <span class="lang-tag">+ 85 more</span>
+            <span class="lang-tag">and many more</span>
           </div>
 
-          <!-- Romanization / Script Switcher Demo -->
           <div class="script-demo-box">
-            <div class="script-demo-head">
-              <span>Bilingual Romanization Preview</span>
-              <span>Gemini Converter</span>
-            </div>
+            <div class="script-demo-head"><span>Romanization preview</span><span>Gemini converter</span></div>
             <div class="script-bubble">
-              <span style="color:var(--muted);font-size:0.78rem">Spoken Hindi:</span><br>
+              <small>You say (Hindi)</small>
               कल शाम की मीटिंग का सारांश भेज दिया है।
             </div>
             <div class="script-bubble result">
-              <span style="color:var(--plum);font-size:0.78rem">Roman Hinglish Output:</span><br>
+              <small>Owlio writes (Roman Hinglish)</small>
               Kal shaam ki meeting ka saaransh bhej diya hai.
             </div>
           </div>
@@ -1100,126 +602,209 @@
       </div>
     </section>
 
-    <!-- Privacy Section -->
+    <!-- Privacy -->
     <section id="privacy" class="privacy-section">
       <div class="wrap privacy-wrap">
         <div>
-          <p class="section-eyebrow">Trust & Privacy by Architecture</p>
+          <p class="section-eyebrow">Privacy by architecture</p>
           <h2 class="section-title">Clear boundaries about what leaves your PC</h2>
-          <p style="margin:16px 0 24px;color:#4f6353;font-size:1.05rem;line-height:1.6">
-            When you choose local models, speech recognition happens completely on your machine. Cloud AI providers are only contacted when you explicitly choose cloud features.
-          </p>
-          <p>
-            <a class="btn btn-secondary" style="border-color:#b9ccb9" href="legal/privacy-notice.html">Read the Privacy Notice →</a>
-            <a class="btn btn-secondary" style="border-color:#b9ccb9;margin-left:10px" href="legal/terms-of-use.html">Terms of Use →</a>
-          </p>
+          <p class="lead">With local models, speech recognition happens entirely on your machine. Cloud AI providers are contacted only when you explicitly turn on a cloud feature.</p>
+          <div class="privacy-links">
+            <a class="btn btn-secondary" href="legal/privacy-notice.html">Privacy Notice →</a>
+            <a class="btn btn-secondary" href="legal/terms-of-use.html">Terms of Use →</a>
+          </div>
         </div>
-
         <ul class="privacy-list">
           <li class="privacy-item">
-            <strong>Usage events exclude content</strong>
-            <span>Basic analytics measure app health. No audio recordings, dictated text, API keys, or email addresses are ever included.</span>
+            <strong>Usage events exclude your content</strong>
+            <span>Basic analytics measure app health. No audio recordings, dictated text, API keys, or email addresses are included.</span>
           </li>
           <li class="privacy-item">
-            <strong>Local history stays on your drive</strong>
-            <span>Your dictation logs, custom vocabulary, and drafts reside in your private Windows user profile.</span>
+            <strong>History stays on your drive</strong>
+            <span>Dictation logs, custom vocabulary, and drafts live in your private Windows user profile.</span>
           </li>
           <li class="privacy-item">
             <strong>Cloud AI is strictly optional</strong>
-            <span>Use local models for complete air-gapped dictation, or connect your own Gemini or Groq API keys when needed.</span>
+            <span>Stay fully local, or connect your own Gemini or Groq API keys when you want them.</span>
           </li>
           <li class="privacy-item">
-            <strong>Free today, no payment card required</strong>
-            <span>Zero subscription fees under current terms. Future paid add-ons will require explicit, separate purchase approval.</span>
+            <strong>Free, no payment card required</strong>
+            <span>No subscription fees under current terms. Any future paid add-on will need your explicit, separate approval.</span>
           </li>
         </ul>
       </div>
     </section>
 
-    <!-- Download Section -->
+    <!-- Download -->
     <section id="download" class="wrap">
       <div class="download-card">
         <div class="download-info">
-          <h3>Get Owlio for Windows</h3>
-          <p>Installer includes the desktop application, setup assistant, and companion overlay. Models are downloaded on demand.</p>
+          <h2>Get Owlio for Windows</h2>
+          <p>The installer includes the desktop app, setup assistant, and companion overlay. Speech models download on demand.</p>
           <div class="meta-tags">
-            <span class="meta-tag">Version 1.0.17</span>
+            <span class="meta-tag" id="version-meta">Version 1.0.17</span>
             <span class="meta-tag">Windows 10 / 11 (x64)</span>
-            <span class="meta-tag">Verified SHA-256</span>
-            <span class="meta-tag">Free MIT Source</span>
+            <span class="meta-tag">SHA-256 published</span>
+            <span class="meta-tag">MIT-licensed source</span>
+          </div>
+          <div class="download-buttons">
+            <a class="btn btn-primary" href="https://github.com/theshubzworld/OwliO/releases/latest">Download Owlio (x64)</a>
+            <a class="btn btn-secondary" href="https://github.com/theshubzworld/OwliO/issues">Report an issue</a>
           </div>
         </div>
-        <div style="flex-shrink:0;display:flex;gap:12px;flex-wrap:wrap">
-          <a class="btn btn-primary" href="https://github.com/theshubzworld/OwliO/releases/latest">
-            Download Owlio (x64) ↓
-          </a>
-          <a class="btn btn-secondary" href="https://github.com/theshubzworld/OwliO/issues">
-            Report Issue
-          </a>
-        </div>
+
+        <aside class="expect-box" aria-labelledby="expect-title">
+          <h3 id="expect-title">What to expect</h3>
+          <ul>
+            <li><strong>Sign-in required.</strong> You'll sign in and accept the <a href="legal/terms-of-use.html">Terms of Use</a> and <a href="legal/privacy-notice.html">Privacy Notice</a>.</li>
+            <li><strong>Unsigned installer.</strong> Windows SmartScreen may show a warning. Verify the SHA-256 hash against the official GitHub Release before running.</li>
+            <li><strong>Basic reliability reporting.</strong> Usage events never include audio, text, API keys, or email.</li>
+          </ul>
+        </aside>
       </div>
-      <p style="text-align:center;font-size:0.8rem;color:var(--muted);margin-top:16px">
-        Installers are unsigned. Windows SmartScreen may show a prompt. Always verify the SHA-256 hash against the official GitHub Release.
-      </p>
     </section>
 
-    <!-- FAQ Section -->
+    <!-- FAQ -->
     <section id="faq" class="wrap">
       <div class="section-head">
-        <p class="section-eyebrow">Got Questions?</p>
-        <h2 class="section-title">Frequently Asked Questions</h2>
+        <p class="section-eyebrow">Got questions?</p>
+        <h2 class="section-title">Frequently asked questions</h2>
       </div>
 
       <div class="faq-list">
         <details class="faq-item" open>
           <summary>How many languages does Owlio support?</summary>
-          <p>Owlio supports over 100 languages worldwide. The multilingual Whisper models recognize 100 global languages (including English, Spanish, French, German, Japanese, Korean, Arabic, Russian, and Chinese) with automatic language detection. Additionally, Bodhan Flex provides deep coverage for 27 regional Indic languages and dialects (including Bhojpuri, Odia, Maithili, Konkani, Haryanvi, and Chhattisgarhi), with optional Roman Hinglish conversion.</p>
-        </details>
-
-        <details class="faq-item">
-          <summary>Do I need to install Python or external packages manually?</summary>
-          <p>No. The Windows installer sets up the full application. Owlio's guided setup downloads its own private, isolated Python runtime and speech model packages automatically.</p>
+          <p>Over 100. The multilingual Whisper models recognize around 100 world languages with automatic detection. Bodhan Flex adds 27 regional Indic languages and dialects, with optional Roman Hinglish conversion. Accuracy varies by language and model size.</p>
         </details>
 
         <details class="faq-item">
           <summary>Does Owlio send my voice or text to external servers?</summary>
-          <p>Not when using local speech models. Speech recognition runs directly on your computer's CPU or NVIDIA GPU. If you choose cloud speech providers (such as Groq) or AI rewrite features (such as Gemini), only the specific audio or text segment for that action is sent using your configuration.</p>
+          <p>Not when you use local speech models. Recognition runs on your CPU or NVIDIA GPU. If you choose a cloud speech provider (such as Groq) or AI rewrites (such as Gemini), only the audio or text for that specific action is sent, using your own configuration.</p>
         </details>
 
         <details class="faq-item">
           <summary>Can I use Owlio completely offline?</summary>
-          <p>Yes. Once your local speech model is downloaded and your account access has completed its daily check, local dictation functions offline without internet connectivity.</p>
+          <p>Yes. Once your local speech model is downloaded and your account access has completed its daily check, local dictation works without an internet connection.</p>
+        </details>
+
+        <details class="faq-item">
+          <summary>Why does Windows show a SmartScreen warning?</summary>
+          <p>The installers are currently unsigned, so SmartScreen may ask you to confirm. Check the SHA-256 hash of your download against the one on the official GitHub Release, and you can also read or build from the MIT-licensed source.</p>
+        </details>
+
+        <details class="faq-item">
+          <summary>Do I need to install Python or other packages?</summary>
+          <p>No. The installer sets up the app, and the guided setup downloads its own private, isolated Python runtime and speech model packages.</p>
         </details>
 
         <details class="faq-item">
           <summary>Is Owlio free and open-source?</summary>
-          <p>Yes. The desktop source code is released under the MIT license on GitHub. The official app is free to use with sign-in, acceptance of terms, and disclosed basic reliability usage reporting.</p>
+          <p>Yes. The desktop source is MIT-licensed on GitHub. The official app is free with sign-in, acceptance of the terms, and disclosed basic reliability reporting.</p>
         </details>
       </div>
     </section>
   </main>
 
-  <!-- Modern Footer -->
   <footer class="footer">
     <div class="wrap footer-content">
-      <div style="display:flex;align-items:center;gap:12px">
-        <img src="assets/owlio-icon-128.png" alt="Owlio" style="width:32px;height:32px">
-        <span style="font-family:var(--font-display);font-weight:700;font-size:1.15rem">Owlio</span>
+      <div class="footer-brand">
+        <img src="assets/owlio-icon-128.png" alt="">
+        <span>Owlio</span>
       </div>
       <nav class="footer-links" aria-label="Footer navigation">
-        <a href="https://github.com/theshubzworld/OwliO">GitHub Repository</a>
-        <a href="https://github.com/theshubzworld/OwliO/releases">All Releases</a>
+        <a href="https://github.com/theshubzworld/OwliO">GitHub</a>
+        <a href="https://github.com/theshubzworld/OwliO/releases">All releases</a>
         <a href="legal/terms-of-use.html">Terms of Use</a>
         <a href="legal/privacy-notice.html">Privacy Notice</a>
         <a href="mailto:shubzveo@gmail.com">Contact</a>
       </nav>
     </div>
     <div class="wrap">
-      <p class="copyright">
-        © 2026 Owlio contributors. Owlio desktop source is licensed under the MIT License. Third-party speech models retain their respective open-weights licenses.
-      </p>
+      <p class="copyright">© 2026 Owlio contributors. Owlio desktop source is licensed under the MIT License. Third-party speech models retain their respective open-weights licenses.</p>
     </div>
   </footer>
 
+  <script>
+    (function () {
+      /* ---------- Animated demo: English -> Hindi -> Hinglish ---------- */
+      var phrases = [
+        { lang: 'English', text: 'Hey team, the new release notes are ready. Transcription is fast, even fully offline.' },
+        { lang: 'हिन्दी', text: 'कल शाम की मीटिंग का सारांश भेज दिया है।' },
+        { lang: 'Hinglish', text: 'Please share the deck, mujhe kal subah tak review karna hai.' }
+      ];
+      var textEl = document.getElementById('demo-text');
+      var langEl = document.getElementById('demo-lang');
+      if (!textEl || !langEl) return;
+
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return; // keep the static English sample
+
+      // Split into grapheme clusters so Devanagari conjuncts don't break mid-character
+      function split(str) {
+        if (window.Intl && Intl.Segmenter) {
+          return Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(str), function (s) { return s.segment; });
+        }
+        return Array.from(str);
+      }
+
+      var i = 0, timer;
+      function sleep(ms) { return new Promise(function (r) { timer = setTimeout(r, ms); }); }
+
+      async function run() {
+        while (true) {
+          var p = phrases[i % phrases.length];
+          var chars = split(p.text);
+          langEl.textContent = p.lang;
+          textEl.textContent = '';
+          for (var c = 0; c < chars.length; c++) {
+            textEl.textContent += chars[c];
+            await sleep(32 + Math.random() * 28);
+          }
+          await sleep(2600);
+          // quick erase
+          for (var e = chars.length; e > 0; e -= 3) {
+            textEl.textContent = chars.slice(0, Math.max(0, e - 3)).join('');
+            await sleep(14);
+          }
+          await sleep(350);
+          i++;
+        }
+      }
+
+      // Pause when the tab is hidden to save battery
+      var running = false;
+      function start() { if (!running) { running = true; run(); } }
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+          if (entries[0].isIntersecting) start();
+        }, { threshold: 0.2 }).observe(document.querySelector('.mockup-card'));
+      } else { start(); }
+    })();
+
+    /* ---------- Live version + GitHub stars (fail silently) ---------- */
+    (function () {
+      var repo = 'theshubzworld/OwliO';
+      fetch('https://api.github.com/repos/' + repo + '/releases/latest')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.tag_name) return;
+          var v = d.tag_name.charAt(0).toLowerCase() === 'v' ? d.tag_name : 'v' + d.tag_name;
+          var tag = document.getElementById('version-tag');
+          var meta = document.getElementById('version-meta');
+          if (tag) tag.textContent = v;
+          if (meta) meta.textContent = 'Version ' + v.replace(/^v/i, '');
+        }).catch(function () {});
+
+      fetch('https://api.github.com/repos/' + repo)
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || typeof d.stargazers_count !== 'number' || d.stargazers_count < 1) return;
+          var el = document.getElementById('stars');
+          if (!el) return;
+          el.textContent = '★ ' + d.stargazers_count.toLocaleString();
+          el.classList.add('on');
+        }).catch(function () {});
+    })();
+  </script>
 </body>
 </html>
