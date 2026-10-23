@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f4ee">
+  <meta name="description" content="Owlio Privacy Notice — detailed explanation of data handling, local storage boundaries, and usage reporting.">
+  <title>Owlio Privacy Notice</title>
+  <link rel="icon" href="../assets/owlio-icon-128.png" type="image/png">
+  <style>
+    :root{color-scheme:light;--ink:#432536;--muted:#756775;--plum:#6d354e;--plum-dark:#54283d;--peach:#f0a66c;--paper:#f7f4ee;--white:#fffdfa;--line:#e9e1d8;--green:#566e5d;--shadow:0 18px 55px #43253612;--serif:Georgia,"Times New Roman",serif;--sans:Inter,"Segoe UI",system-ui,-apple-system,sans-serif}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.7}a{color:var(--plum);text-decoration:none}a:hover{text-decoration:underline}.wrap{width:min(860px,calc(100% - 44px));margin-inline:auto}.topbar{height:76px;display:flex;align-items:center;justify-content:space-between;gap:22px;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:750;font-size:1.3rem;color:var(--ink);letter-spacing:-.04em}.brand img{width:36px;height:36px}.nav-back{display:inline-flex;align-items:center;gap:6px;padding:7px 15px;border:1px solid #d9c9c4;border-radius:99px;color:var(--plum);font-weight:650;font-size:.9rem}.doc-card{margin:36px auto 60px;padding:48px 42px;border:1px solid var(--line);border-radius:24px;background:var(--white);box-shadow:var(--shadow)}h1{margin:0 0 14px;font:clamp(2.2rem,5vw,3rem)/1.15 var(--serif);letter-spacing:-.035em;color:var(--ink)}.meta-bar{display:flex;flex-wrap:wrap;gap:12px;margin:0 0 28px;padding-bottom:20px;border-bottom:1px solid var(--line);font-size:.85rem;color:var(--muted)}.meta-badge{background:#f3edf0;color:var(--plum);padding:3px 10px;border-radius:99px;font-weight:600}.doc-card h2{margin:32px 0 10px;font:1.35rem var(--serif);color:var(--ink);letter-spacing:-.02em}.doc-card p{margin:0 0 16px;color:#4f3e4c;font-size:1.02rem}.footer{padding:34px 0 42px;border-top:1px solid var(--line);text-align:center;font-size:.85rem;color:var(--muted)}.footer a{color:var(--muted);margin:0 10px}.footer a:hover{color:var(--plum)}
+    @media(max-width:600px){.doc-card{padding:30px 20px;border-radius:18px}.topbar{height:65px}}
+  </style>
+</head>
+<body>
+  <header class="wrap topbar">
+    <a class="brand" href="../index.html" aria-label="Owlio home">
+      <img src="../assets/owlio-icon-128.png" alt="">
+      <span>Owlio</span>
+    </a>
+    <a class="nav-back" href="../index.html">← Back to Owlio</a>
+  </header>
+
+  <main class="wrap">
+    <article class="doc-card">
+      <h1>Owlio Privacy Notice</h1>
+      <div class="meta-bar">
+        <span>Version: <strong class="meta-badge">2026-10-23</strong></span>
+        <span>Document bundle SHA-256: <code>6f58703940881e9deffe3aea476a03e85d58108aefc00cc1cc395c0ebb5c5dac</code></span>
+      </div>
+
+      <h2>Who handles the data</h2>
+      <p>The Owlio project maintainers operate the official app’s account and usage services. Contact: <a href="mailto:shubzveo@gmail.com">shubzveo@gmail.com</a>.</p>
+
+      <h2>Account and agreement records</h2>
+      <p>Supabase handles sign-in. Account records include your account ID, email address, sign-in provider and authentication information. Owlio separately stores which Terms and Privacy Notice versions you accepted, a fingerprint of those documents, the server acceptance timestamp, app version, and any account suspension record. These records identify your account; they are separate from usage-event payloads. Session credentials are encrypted on your computer using Windows protection and are cleared by signing out.</p>
+
+      <h2>Required usage events and purpose</h2>
+      <p>After you sign in and explicitly accept, the official app reports basic usage to measure adoption, reliability and feature performance. Events include a random installation ID; activity counts; app and Windows versions; provider, model and language categories; stage timings; audio duration and word counts; and success or failure counts. There is no session replay or automatic screen capture. The payload does not contain your account email or ID, audio, dictated or selected text, commands, API keys, or window titles. Account login and agreement records remain identifiable. No analytics events are sent before acceptance; signing out stops collection and clears unsent events.</p>
+
+      <h2>Network metadata and service providers</h2>
+      <p>Supabase hosts account records, agreement records and usage events. Network requests necessarily expose connection metadata such as IP addresses to infrastructure providers. The collector uses a daily one-way network bucket for abuse limits and does not store raw IP addresses in Owlio usage tables. Provider infrastructure logs may retain their own request metadata. A separately configured analytics processor, such as PostHog, may receive the same limited usage events; account email and content are not forwarded in those events.</p>
+
+      <h2>Local information and optional cloud AI</h2>
+      <p>History, saved audio when enabled, dictionary entries, settings, writing rules and provider keys stay on this computer unless the selected feature sends relevant information to a provider. Groq speech receives audio when selected. Gemini romanization and cleanup receive the relevant text. Cloud rewrite and meeting-summary features receive selected text, commands or transcripts as needed. Local models process locally. Correction learning can send spelling candidates to the configured writing provider. Those providers apply their own privacy policies; required basic analytics does not authorize additional content collection.</p>
+
+      <h2>Retention and stopping use</h2>
+      <p>Owlio usage events expire after 90 days; inactive installation records are removed after 90 days. Unsent events are bounded to 200 entries and expire after seven days. Abuse-rate buckets expire after two days. Account and agreement records remain while the account is active, so Owlio can verify access and the accepted versions. Deleting an account removes its agreement records. Suspension audit entries expire after 90 days. To stop reporting, sign out and stop using the official app; there is no separate analytics opt-out while using this free service. Local history can be managed in the app and is not deleted merely by signing out.</p>
+
+      <h2>Requests and updates</h2>
+      <p>Contact <a href="mailto:shubzveo@gmail.com">shubzveo@gmail.com</a> from your account email to request access to, correction of, or deletion of your account data, or to raise a privacy concern. The maintainers may need to verify control of the account. Applicable privacy rights remain available. Updated document versions will be shown for renewed acceptance.</p>
+    </article>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <nav>
+        <a href="../index.html">Owlio Home</a>
+        <a href="terms-of-use.html">Terms of Use</a>
+        <a href="privacy-notice.html">Privacy Notice</a>
+        <a href="https://github.com/theshubzworld/OwliO">GitHub Repository</a>
+        <a href="mailto:shubzveo@gmail.com">Contact</a>
+      </nav>
+      <p style="margin-top:14px">© 2026 Owlio contributors. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>
