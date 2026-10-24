@@ -12,6 +12,20 @@ export interface RecordingStartupTiming {
   firstChunkMs?: number;
 }
 
+export interface AudioRecorderOptions {
+  deviceId?: string;
+  echoCancellation?: boolean;
+  noiseSuppression?: boolean;
+  autoGainControl?: boolean;
+}
+
+export interface AudioMetrics {
+  volume: number;
+  rms: number;
+  peak: number;
+  db: number;
+}
+
 type Capture = { id: number; stream: MediaStream; source: MediaStreamAudioSourceNode; analyser: AnalyserNode; buffers: Float32Array[]; totalSamples: number; pendingSamples: number; limitNotified: boolean; requestedAt: number; timing: RecordingStartupTiming; ready: boolean };
 
 export class AudioRecorder {
@@ -26,6 +40,7 @@ export class AudioRecorder {
   private commands = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
 
   public onVolumeChange: ((volume: number) => void) | null = null;
+  public onAudioMetrics: ((metrics: AudioMetrics) => void) | null = null;
   public onMicrophoneChange: ((label: string) => void) | null = null;
   public onInputEnded: (() => void) | null = null;
   public onStartupTiming: ((timing: RecordingStartupTiming) => void) | null = null;
@@ -98,7 +113,7 @@ export class AudioRecorder {
     });
   }
 
-  public async start(deviceId?: string): Promise<void> {
+  public async start(options?: string | AudioRecorderOptions): Promise<void> {
     if (this.disposed) throw new Error('Recorder is closed');
     if (this.capture && !this.stopping) throw new Error('Recording is already active');
     const operation = ++this.operation;
@@ -106,6 +121,11 @@ export class AudioRecorder {
     if (this.stopping) await this.stopping;
     if (operation !== this.operation) throw new DOMException('Recording was cancelled', 'AbortError');
     if (this.capture) throw new Error('Recording is already active');
+    const deviceId = typeof options === 'string' ? options : options?.deviceId;
+    const echoCancellation = typeof options === 'object' && options?.echoCancellation !== undefined ? options.echoCancellation : true;
+    const noiseSuppression = typeof options === 'object' && options?.noiseSuppression !== undefined ? options.noiseSuppression : true;
+    const autoGainControl = typeof options === 'object' && options?.autoGainControl !== undefined ? options.autoGainControl : true;
+
     let stream: MediaStream | null = null;
     let source: MediaStreamAudioSourceNode | null = null;
     let analyser: AnalyserNode | null = null;
@@ -114,7 +134,7 @@ export class AudioRecorder {
     const timing: RecordingStartupTiming = { engineReadyMs: 0, microphoneReadyMs: 0, captureReadyMs: 0 };
     try {
       const engine = this.prepare().then(() => { timing.engineReadyMs = performance.now() - requestedAt; });
-      const audio: MediaTrackConstraints = { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+      const audio: MediaTrackConstraints = { channelCount: 1, sampleRate: 16000, echoCancellation, noiseSuppression, autoGainControl };
       if (deviceId && deviceId !== 'default') audio.deviceId = deviceId === 'communications' ? { ideal: deviceId } : { exact: deviceId };
       const request = async () => {
         try { return await navigator.mediaDevices.getUserMedia({ audio }); }
@@ -147,7 +167,8 @@ export class AudioRecorder {
       if (operation !== this.operation) throw new DOMException('Recording was cancelled', 'AbortError');
       source = context.createMediaStreamSource(acquired);
       analyser = context.createAnalyser();
-      analyser.fftSize = 64;
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.3;
       source.connect(analyser);
       analyser.connect(this.recorderNode!);
       this.capture = { id: operation, stream: acquired, source, analyser, buffers: [], totalSamples: 0, pendingSamples: 0, limitNotified: false, requestedAt, timing, ready: false };
@@ -171,10 +192,54 @@ export class AudioRecorder {
   private monitorVolume(): void {
     const capture = this.capture;
     if (!capture?.ready || capture.id !== this.operation) return;
-    const data = new Uint8Array(capture.analyser.frequencyBinCount);
-    capture.analyser.getByteFrequencyData(data);
-    const average = data.reduce((sum, value) => sum + value, 0) / data.length;
-    this.onVolumeChange?.(Math.min(1, average / 128));
+    let volume = 0;
+    let rms = 0;
+    let peak = 0;
+    let db = -100;
+
+    if (typeof capture.analyser.getFloatTimeDomainData === 'function') {
+      const timeData = new Float32Array(capture.analyser.fftSize || 256);
+      capture.analyser.getFloatTimeDomainData(timeData);
+      let sumSquares = 0;
+      for (let i = 0; i < timeData.length; i++) {
+        const val = timeData[i];
+        const abs = Math.abs(val);
+        if (abs > peak) peak = abs;
+        sumSquares += val * val;
+      }
+      rms = Math.sqrt(sumSquares / timeData.length);
+      db = 20 * Math.log10(Math.max(1e-5, rms));
+      // Map -45 dB (noise floor) to -6 dB (peak speech) to 0.0 .. 1.0
+      volume = Math.min(1, Math.max(0, (db - (-45)) / ((-6) - (-45))));
+      if (peak > 0.02 && volume < 0.12) {
+        volume = Math.min(1, 0.12 + (peak * 0.7));
+      }
+    } else if (typeof capture.analyser.getByteTimeDomainData === 'function') {
+      const data = new Uint8Array(capture.analyser.fftSize || 256);
+      capture.analyser.getByteTimeDomainData(data);
+      let sumSquares = 0;
+      for (let i = 0; i < data.length; i++) {
+        const norm = (data[i] - 128) / 128;
+        const abs = Math.abs(norm);
+        if (abs > peak) peak = abs;
+        sumSquares += norm * norm;
+      }
+      rms = Math.sqrt(sumSquares / data.length);
+      db = 20 * Math.log10(Math.max(1e-5, rms));
+      volume = Math.min(1, Math.max(0, (db - (-45)) / ((-6) - (-45))));
+    } else {
+      // Test environment fallback
+      const data = new Uint8Array(capture.analyser.frequencyBinCount || 32);
+      capture.analyser.getByteFrequencyData?.(data);
+      const average = data.reduce((sum, value) => sum + value, 0) / (data.length || 1);
+      volume = Math.min(1, average / 128);
+      rms = volume * 0.1;
+      peak = volume;
+      db = 20 * Math.log10(Math.max(1e-5, rms));
+    }
+
+    this.onVolumeChange?.(volume);
+    this.onAudioMetrics?.({ volume, rms, peak, db });
     this.animationFrameId = requestAnimationFrame(() => this.monitorVolume());
   }
 

@@ -29,6 +29,11 @@ import {
   ArrowUpRight,
   ChevronDown,
   ShieldCheck,
+  RotateCcw,
+  VolumeX,
+  Volume1,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 import { ShortcutSettings } from './ShortcutSettings';
 import { PrivacySettings } from './PrivacySettings';
@@ -75,11 +80,37 @@ export const DashboardApp: React.FC = () => {
     return DASHBOARD_TABS.includes(tab) ? tab : 'dictation';
   });
 
-  // Audio input devices
+  // Audio input devices & mic diagnostic testing
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [isTestingMic, setIsTestingMic] = useState(false);
   const [micTestVolume, setMicTestVolume] = useState(0);
+  const [micPeakVolume, setMicPeakVolume] = useState(0);
+  const [micTestDb, setMicTestDb] = useState(-100);
   const testRecorderRef = useRef<AudioRecorder | null>(null);
+  const peakHoldTimeRef = useRef<number>(0);
+
+  // Audio DSP constraints toggles
+  const [micNoiseSuppression, setMicNoiseSuppression] = useState(true);
+  const [micAutoGainControl, setMicAutoGainControl] = useState(true);
+  const [micEchoCancellation, setMicEchoCancellation] = useState(true);
+
+  // Quality Recording & Playback test
+  const [isRecordingQualitySample, setIsRecordingQualitySample] = useState(false);
+  const [qualityCountdown, setQualityCountdown] = useState(5);
+  const [qualitySampleUrl, setQualitySampleUrl] = useState<string | null>(null);
+  const [qualityIsPlaying, setQualityIsPlaying] = useState(false);
+  const [qualityMetrics, setQualityMetrics] = useState<{
+    peakDb: number;
+    speechRmsDb: number;
+    noiseFloorDb: number;
+    snr: number;
+    status: 'optimal' | 'low' | 'noisy' | 'silent';
+    verdict: string;
+    recommendations: string[];
+  } | null>(null);
+  const qualityRecorderRef = useRef<AudioRecorder | null>(null);
+  const qualityTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const qualityAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   // Settings state
   const [settings, setSettings] = useState<any>({
@@ -222,6 +253,9 @@ export const DashboardApp: React.FC = () => {
       cleanupNavigation();
       void testRecorderRef.current?.dispose();
       void meetingRecorderRef.current?.dispose();
+      void qualityRecorderRef.current?.dispose();
+      if (qualityTimerRef.current) clearInterval(qualityTimerRef.current);
+      if (qualityAudioPlayerRef.current) qualityAudioPlayerRef.current.pause();
       clearInterval(meetingTimerRef.current);
     };
   }, []);
@@ -310,23 +344,190 @@ export const DashboardApp: React.FC = () => {
     if (isTestingMic) {
       setIsTestingMic(false);
       setMicTestVolume(0);
+      setMicPeakVolume(0);
+      setMicTestDb(-100);
       await testRecorderRef.current?.dispose();
       testRecorderRef.current = null;
     } else {
       setIsTestingMic(true);
+      setMicTestVolume(0);
+      setMicPeakVolume(0);
+      setMicTestDb(-100);
       await testRecorderRef.current?.dispose();
       if (!accessAllowedRef.current) { setIsTestingMic(false); return; }
-      testRecorderRef.current = new AudioRecorder();
-      testRecorderRef.current.onVolumeChange = (vol) => {
-        setMicTestVolume(vol);
+      const recorder = new AudioRecorder();
+      testRecorderRef.current = recorder;
+      recorder.onAudioMetrics = ({ volume, db }) => {
+        setMicTestDb(Math.round(db));
+        setMicTestVolume((prev) => (volume > prev ? volume : Math.max(0, prev - 0.035)));
+        setMicPeakVolume((prev) => {
+          if (volume > prev) {
+            peakHoldTimeRef.current = Date.now() + 1500;
+            return volume;
+          }
+          if (Date.now() > peakHoldTimeRef.current) {
+            return Math.max(0, prev - 0.02);
+          }
+          return prev;
+        });
+      };
+      recorder.onVolumeChange = (vol) => {
+        setMicTestVolume((prev) => (vol > prev ? vol : Math.max(0, prev - 0.035)));
       };
       try {
-        await testRecorderRef.current.start(settings.microphoneDeviceId);
+        await recorder.start({
+          deviceId: settings.microphoneDeviceId,
+          noiseSuppression: micNoiseSuppression,
+          autoGainControl: micAutoGainControl,
+          echoCancellation: micEchoCancellation,
+        });
       } catch (err) {
         console.error('Failed to test microphone', err);
         await testRecorderRef.current?.dispose();
         setIsTestingMic(false);
       }
+    }
+  };
+
+  const stopQualityRecording = async () => {
+    if (qualityTimerRef.current) {
+      clearInterval(qualityTimerRef.current);
+      qualityTimerRef.current = null;
+    }
+    const recorder = qualityRecorderRef.current;
+    if (!recorder) {
+      setIsRecordingQualitySample(false);
+      return;
+    }
+    try {
+      const result = await recorder.stop();
+      await recorder.dispose();
+      qualityRecorderRef.current = null;
+      setIsRecordingQualitySample(false);
+
+      if (result && result.buffer && result.buffer.byteLength > 44) {
+        const blob = new Blob([result.buffer], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        setQualitySampleUrl(url);
+
+        const int16 = new Int16Array(result.buffer, 44);
+        let peak = 0;
+        let sumSquares = 0;
+        const frameSize = 800; // 50ms at 16kHz
+        const frameRmsList: number[] = [];
+
+        for (let i = 0; i < int16.length; i += frameSize) {
+          const slice = int16.subarray(i, Math.min(int16.length, i + frameSize));
+          let sliceSq = 0;
+          for (let j = 0; j < slice.length; j++) {
+            const norm = slice[j] / 32768.0;
+            const abs = Math.abs(norm);
+            if (abs > peak) peak = abs;
+            sliceSq += norm * norm;
+          }
+          const sliceRms = Math.sqrt(sliceSq / slice.length);
+          frameRmsList.push(sliceRms);
+          sumSquares += sliceSq;
+        }
+
+        frameRmsList.sort((a, b) => a - b);
+        const noiseCount = Math.max(1, Math.floor(frameRmsList.length * 0.25));
+        const speechCount = Math.max(1, Math.floor(frameRmsList.length * 0.35));
+        const noiseFloorRms = frameRmsList.slice(0, noiseCount).reduce((a, b) => a + b, 0) / noiseCount;
+        const speechRms = frameRmsList.slice(-speechCount).reduce((a, b) => a + b, 0) / speechCount;
+
+        const peakDb = Math.round(20 * Math.log10(Math.max(1e-5, peak)));
+        const speechRmsDb = Math.round(20 * Math.log10(Math.max(1e-5, speechRms)));
+        const noiseFloorDb = Math.round(20 * Math.log10(Math.max(1e-5, noiseFloorRms)));
+        const snr = Math.max(0, speechRmsDb - noiseFloorDb);
+
+        let status: 'optimal' | 'low' | 'noisy' | 'silent' = 'optimal';
+        let verdict = 'Optimal: Clear speech, excellent for AI transcription';
+        const recommendations: string[] = [];
+
+        if (peak < 0.012 || peakDb < -38) {
+          status = 'silent';
+          verdict = 'Silent: No speech detected';
+          recommendations.push('Check if your microphone has a hardware mute switch or is muted in Windows.');
+          recommendations.push('Verify Windows microphone permissions under Settings → Privacy & Security → Microphone.');
+        } else if (peakDb < -22 || speechRmsDb < -34) {
+          status = 'low';
+          verdict = 'Low volume: Speech is quiet';
+          recommendations.push('Move closer to your microphone (10-15 cm / 4-6 inches).');
+          recommendations.push('Open Windows Sound Settings and increase your microphone input volume slider to 80%-100%.');
+          recommendations.push('If your mic has a physical gain dial or USB interface, increase its input level.');
+        } else if (noiseFloorDb > -28 || snr < 10) {
+          status = 'noisy';
+          verdict = 'High background noise detected';
+          recommendations.push('Background noise (PC fan, typing, room echo) was detected in the silent parts.');
+          recommendations.push('Keep Noise Suppression enabled or move to a quieter room for optimal transcription.');
+        } else {
+          status = 'optimal';
+          verdict = 'Optimal: Crisp voice with clean background';
+          recommendations.push('Signal strength and clarity are ideal for offline Whisper transcription.');
+        }
+
+        setQualityMetrics({ peakDb, speechRmsDb, noiseFloorDb, snr, status, verdict, recommendations });
+      } else {
+        setIsRecordingQualitySample(false);
+      }
+    } catch (e) {
+      console.error('Failed to stop quality recording', e);
+      setIsRecordingQualitySample(false);
+    }
+  };
+
+  const startQualityRecording = async () => {
+    if (isTestingMic) await handleTestMicToggle();
+    if (qualityAudioPlayerRef.current) {
+      qualityAudioPlayerRef.current.pause();
+      setQualityIsPlaying(false);
+    }
+    setQualitySampleUrl(null);
+    setQualityMetrics(null);
+    setQualityCountdown(5);
+    setIsRecordingQualitySample(true);
+
+    const recorder = new AudioRecorder();
+    qualityRecorderRef.current = recorder;
+
+    try {
+      await recorder.start({
+        deviceId: settings.microphoneDeviceId,
+        noiseSuppression: micNoiseSuppression,
+        autoGainControl: micAutoGainControl,
+        echoCancellation: micEchoCancellation,
+      });
+
+      let remaining = 5;
+      qualityTimerRef.current = setInterval(() => {
+        remaining -= 1;
+        setQualityCountdown(remaining);
+        if (remaining <= 0) {
+          void stopQualityRecording();
+        }
+      }, 1000);
+    } catch (err) {
+      console.error('Failed to start quality recording', err);
+      setIsRecordingQualitySample(false);
+    }
+  };
+
+  const handleToggleQualityPlayback = () => {
+    if (!qualitySampleUrl) return;
+    if (qualityIsPlaying) {
+      qualityAudioPlayerRef.current?.pause();
+      setQualityIsPlaying(false);
+    } else {
+      if (!qualityAudioPlayerRef.current) {
+        const audio = new Audio(qualitySampleUrl);
+        qualityAudioPlayerRef.current = audio;
+        audio.onended = () => setQualityIsPlaying(false);
+        audio.onerror = () => setQualityIsPlaying(false);
+      } else {
+        qualityAudioPlayerRef.current.src = qualitySampleUrl;
+      }
+      qualityAudioPlayerRef.current.play().then(() => setQualityIsPlaying(true)).catch(() => setQualityIsPlaying(false));
     }
   };
 
@@ -1280,23 +1481,39 @@ export const DashboardApp: React.FC = () => {
               </label>
               <p id="startup-description" className="muted">{!startupStatus?'Checking Windows startup settings…':!startupStatus.supported?'Available in the installed Windows app.':startupStatus.error||'After setup, Owlio starts minimized with the floating bar ready.'}</p>
             </section>
-            {/* Microphone Selection & Test VU Meter */}
+            {/* Microphone Selection & Comprehensive Quality Diagnostic Suite */}
             <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Volume2 size={20} color="#396F68" />
-                <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Your microphone</h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Volume2 size={20} color="#396F68" />
+                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Your microphone</h3>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '12px', height: '28px' }}
+                  onClick={() => void loadAudioDevices(true)}
+                  title="Rescan connected audio devices"
+                >
+                  <RotateCcw size={13} />
+                  <span>Rescan mics</span>
+                </button>
               </div>
               <p style={{ fontSize: '13px', color: '#746F6B', marginTop: '4px' }}>
-                Use the Windows default or choose a microphone.
+                Use the Windows default or choose a microphone. Run a live level test or record a sample to inspect audio quality.
               </p>
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+              {/* Device Dropdown & Primary Test Action */}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
                 <select
                   aria-label="Your microphone"
                   className="select"
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, minWidth: '220px' }}
                   value={settings.microphoneDeviceId || ''}
-                  onChange={(e) => setSettings({ ...settings, microphoneDeviceId: e.target.value })}
+                  onChange={(e) => {
+                    setSettings({ ...settings, microphoneDeviceId: e.target.value });
+                    if (isTestingMic) void handleTestMicToggle();
+                  }}
                 >
                   <option value="">Windows default</option>
                   {audioDevices.map((d) => (
@@ -1307,33 +1524,237 @@ export const DashboardApp: React.FC = () => {
                 </select>
 
                 <button
+                  type="button"
                   className={`btn ${isTestingMic ? 'btn-danger' : 'btn-secondary'}`}
                   onClick={handleTestMicToggle}
+                  disabled={isRecordingQualitySample}
+                  style={{ whiteSpace: 'nowrap' }}
                 >
                   <Mic size={16} />
-                  <span>{isTestingMic ? 'Stop test' : 'Test microphone'}</span>
+                  <span>{isTestingMic ? 'Stop live meter' : 'Live level meter'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`btn ${isRecordingQualitySample ? 'btn-danger' : 'btn-primary'}`}
+                  onClick={() => {
+                    if (isRecordingQualitySample) void stopQualityRecording();
+                    else void startQualityRecording();
+                  }}
+                  disabled={isTestingMic}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {isRecordingQualitySample ? (
+                    <>
+                      <Square size={15} />
+                      <span>Stop sample ({qualityCountdown}s)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume1 size={16} />
+                      <span>Record 5s quality sample</span>
+                    </>
+                  )}
                 </button>
               </div>
 
-              {/* Live VU Meter */}
+              {/* Live VU Meter with Peak Hold & Decay */}
               {isTestingMic && (
-                <div style={{ marginTop: '14px', padding: '12px', background: '#EDEAE3', borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#746F6B', marginBottom: '6px' }}>
-                    <span>Speak and watch the level move:</span>
-                    <span>{Math.round(micTestVolume * 100)}% Volume</span>
+                <div style={{ marginTop: '14px', padding: '14px', background: '#EDEAE3', borderRadius: '10px', border: '1px solid #DFD9CF' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#65535B', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Radio size={14} color={micTestVolume > 0.1 ? '#2E7D32' : '#746F6B'} />
+                      <strong style={{ fontWeight: 600 }}>Live Input Signal:</strong>
+                      <span>{Math.round(micTestVolume * 100)}% Volume</span>
+                      {micTestDb > -90 && <span style={{ color: '#8A827D' }}>({micTestDb} dBFS)</span>}
+                    </div>
+                    <div style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: '#8A827D' }}>Peak:</span>
+                      <strong style={{ color: micPeakVolume > 0.85 ? '#DC2626' : micPeakVolume > 0.2 ? '#2E7D32' : '#8A827D' }}>
+                        {Math.round(micPeakVolume * 100)}%
+                      </strong>
+                    </div>
                   </div>
-                  <div style={{ width: '100%', height: '10px', background: '#E3DFD7', borderRadius: '5px', overflow: 'hidden' }}>
+
+                  {/* Multi-segment Level Bar with Peak Indicator */}
+                  <div style={{ position: 'relative', width: '100%', height: '12px', background: '#DDD7CD', borderRadius: '6px', overflow: 'hidden' }}>
                     <div
                       style={{
                         width: `${Math.min(100, micTestVolume * 100)}%`,
                         height: '100%',
-                        background: micTestVolume > 0.05 ? '#36754C' : '#B14848',
-                        transition: 'width 0.05s ease-out',
+                        background: micTestVolume > 0.85 ? '#DC2626' : micTestVolume > 0.65 ? '#D97706' : micTestVolume > 0.08 ? '#2E7D32' : '#A8A29E',
+                        transition: 'width 0.04s ease-out, background-color 0.1s ease',
                       }}
                     />
+                    {/* Peak Hold Marker */}
+                    {micPeakVolume > 0.02 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: `${Math.min(99, micPeakVolume * 100)}%`,
+                          width: '2px',
+                          height: '100%',
+                          background: '#1F2937',
+                          boxShadow: '0 0 2px rgba(0,0,0,0.5)',
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Live Feedback Status */}
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                    {micTestVolume < 0.03 ? (
+                      <span style={{ color: '#9E9A95', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <VolumeX size={14} /> Silent / No signal — speak or check if your microphone is unmuted.
+                      </span>
+                    ) : micTestVolume < 0.2 ? (
+                      <span style={{ color: '#B45309', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <AlertTriangle size={14} /> Low volume — speak closer to the mic or raise Windows input volume.
+                      </span>
+                    ) : micTestVolume <= 0.85 ? (
+                      <span style={{ color: '#2E7D32', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500 }}>
+                        <CheckCircle2 size={14} /> Clear speech level (Optimal for Whisper).
+                      </span>
+                    ) : (
+                      <span style={{ color: '#DC2626', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500 }}>
+                        <AlertTriangle size={14} /> Very loud — watch out for clipping / audio distortion.
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
+
+              {/* Quality Sample Recording in Progress */}
+              {isRecordingQualitySample && (
+                <div style={{ marginTop: '14px', padding: '16px', background: '#FBF0EE', border: '1px solid #F5C6CB', borderRadius: '10px', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', color: '#9B2C2C', fontWeight: 600 }}>
+                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#E53E3E', animation: 'pulse 1s infinite' }} />
+                    <span>Speak naturally: testing voice clarity &amp; noise floor ({qualityCountdown}s remaining)...</span>
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#746F6B', marginTop: '6px' }}>Say a normal test sentence like "Owlio dictation is working nicely on my Windows PC."</p>
+                </div>
+              )}
+
+              {/* Quality Analysis & Audio Playback Box */}
+              {!isRecordingQualitySample && qualitySampleUrl && qualityMetrics && (
+                <div style={{ marginTop: '14px', padding: '16px', background: '#F8F6F2', border: '1px solid #E5DFD5', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {qualityMetrics.status === 'optimal' ? (
+                        <CheckCircle2 size={20} color="#2E7D32" />
+                      ) : qualityMetrics.status === 'silent' ? (
+                        <VolumeX size={20} color="#DC2626" />
+                      ) : (
+                        <AlertTriangle size={20} color="#D97706" />
+                      )}
+                      <div>
+                        <strong style={{ fontSize: '14px', color: qualityMetrics.status === 'optimal' ? '#2E7D32' : qualityMetrics.status === 'silent' ? '#DC2626' : '#B45309' }}>
+                          {qualityMetrics.verdict}
+                        </strong>
+                        <div style={{ fontSize: '12px', color: '#746F6B' }}>5-second test recording analyzed</div>
+                      </div>
+                    </div>
+
+                    {/* Listen Playback Button */}
+                    <button
+                      type="button"
+                      className={`btn ${qualityIsPlaying ? 'btn-danger' : 'btn-secondary'}`}
+                      onClick={handleToggleQualityPlayback}
+                      style={{ padding: '6px 14px', fontSize: '13px' }}
+                    >
+                      {qualityIsPlaying ? <Pause size={15} /> : <Play size={15} />}
+                      <span>{qualityIsPlaying ? 'Stop listening' : 'Listen to recording'}</span>
+                    </button>
+                  </div>
+
+                  {/* Metrics Badges */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginTop: '14px' }}>
+                    <div style={{ padding: '8px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBE5DC' }}>
+                      <span style={{ fontSize: '11px', color: '#8A827D', display: 'block' }}>Peak Level</span>
+                      <strong style={{ fontSize: '13px', color: qualityMetrics.peakDb > -6 ? '#DC2626' : qualityMetrics.peakDb > -24 ? '#2E7D32' : '#B45309' }}>
+                        {qualityMetrics.peakDb} dBFS
+                      </strong>
+                    </div>
+                    <div style={{ padding: '8px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBE5DC' }}>
+                      <span style={{ fontSize: '11px', color: '#8A827D', display: 'block' }}>Speech Volume</span>
+                      <strong style={{ fontSize: '13px', color: qualityMetrics.speechRmsDb > -30 ? '#2E7D32' : '#B45309' }}>
+                        {qualityMetrics.speechRmsDb} dBFS
+                      </strong>
+                    </div>
+                    <div style={{ padding: '8px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBE5DC' }}>
+                      <span style={{ fontSize: '11px', color: '#8A827D', display: 'block' }}>Noise Floor</span>
+                      <strong style={{ fontSize: '13px', color: qualityMetrics.noiseFloorDb < -35 ? '#2E7D32' : '#B45309' }}>
+                        {qualityMetrics.noiseFloorDb} dBFS
+                      </strong>
+                    </div>
+                    <div style={{ padding: '8px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBE5DC' }}>
+                      <span style={{ fontSize: '11px', color: '#8A827D', display: 'block' }}>Signal-to-Noise</span>
+                      <strong style={{ fontSize: '13px', color: qualityMetrics.snr > 15 ? '#2E7D32' : '#B45309' }}>
+                        ~{qualityMetrics.snr} dB
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Recommendations */}
+                  {qualityMetrics.recommendations.length > 0 && (
+                    <div style={{ marginTop: '12px', padding: '10px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBE5DC', fontSize: '12px', color: '#574F4A' }}>
+                      <strong style={{ display: 'block', marginBottom: '4px', color: '#413833' }}>Recommendations:</strong>
+                      <ul style={{ paddingLeft: '18px', margin: 0 }}>
+                        {qualityMetrics.recommendations.map((rec, i) => (
+                          <li key={i} style={{ marginTop: i > 0 ? '3px' : 0 }}>{rec}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Hardware DSP Processing Controls */}
+              <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #E8E3DA' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                  <strong style={{ fontSize: '12px', color: '#5B5357', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Audio Processing Enhancements</strong>
+                  <span style={{ fontSize: '11px', color: '#8A827D' }}>Applies to both dictation &amp; tests</span>
+                </div>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={micNoiseSuppression}
+                      onChange={(e) => {
+                        setMicNoiseSuppression(e.target.checked);
+                        if (isTestingMic) void handleTestMicToggle();
+                      }}
+                    />
+                    Noise suppression
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={micAutoGainControl}
+                      onChange={(e) => {
+                        setMicAutoGainControl(e.target.checked);
+                        if (isTestingMic) void handleTestMicToggle();
+                      }}
+                    />
+                    Auto gain control (AGC)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={micEchoCancellation}
+                      onChange={(e) => {
+                        setMicEchoCancellation(e.target.checked);
+                        if (isTestingMic) void handleTestMicToggle();
+                      }}
+                    />
+                    Echo cancellation
+                  </label>
+                </div>
+                <p style={{ fontSize: '11px', color: '#8A827D', marginTop: '6px' }}>
+                  Tip: If using an external USB audio interface (like USB-UAC AP) or studio condenser mic, turning off Auto Gain Control often provides cleaner, more natural sound.
+                </p>
+              </div>
             </div>
 
             <ShortcutSettings shortcut={settings.hotkey} mode={settings.mode}
