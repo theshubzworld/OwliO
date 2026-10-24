@@ -9,7 +9,12 @@ tests/.compiled/
 tests/.runtime/
 __pycache__/
 .firecrawl/
-release-artifacts/
+release-artifacts/helper-build/
+release-artifacts/*/win-unpacked/
+release-artifacts/*/*.blockmap
+release-artifacts/*/*.yml
+release-artifacts/1.0.17/
+release-artifacts/1.0.18/
 .env
 cloud-config.json
 supabase/.temp/
