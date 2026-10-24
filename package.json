@@ -1,7 +1,7 @@
 {
   "name": "owlio",
   "productName": "Owlio",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "Ultra-fast, context-aware AI voice dictation for Windows",
   "main": "dist/main/main.js",
   "scripts": {
@@ -13,6 +13,8 @@
     "start": "electron dist/main/main.js",
     "server": "python scripts/run_server.py",
     "server:install": "python -m pip install -r requirements.txt",
+    "pretest": "npm run build:main && tsc -p tsconfig.test.json",
+    "test": "node --test tests/*.test.js",
     "package": "node scripts/package_windows.cjs",
     "dev": "npm run build:helper && tsc -p tsconfig.main.json && vite build && electron dist/main/main.js"
   },

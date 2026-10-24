@@ -1,7 +1,4 @@
 node_modules/
-/tests/
-/tsconfig.test.json
-/test-helper.js
 models/
 server-runtime.json
 .venv/
@@ -31,4 +28,6 @@ Owlio-downloads/
 recordings/
 cookies*.txt
 *.pem
+scratch/
+
 *.key

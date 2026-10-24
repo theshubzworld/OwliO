@@ -153,15 +153,23 @@ async def transcribe(
             active_model = load_whisper_model(model_name)
             if lang in ("hinglish", "hi-en", "english-hinglish") and not hasattr(active_model, "processor") and not getattr(active_model, 'supports_hinglish', False):
                 lang = "hi"
-                speech_prompt = speech_prompt or "Hindi and English conversation. Preserve the spoken words in their original language."
+            transcribe_kwargs = {
+                "language": lang if lang != "auto" else None,
+                "initial_prompt": speech_prompt if speech_prompt else None,
+                "beam_size": 5,
+                "vad_filter": True,
+            }
+            if isinstance(active_model, WhisperModel):
+                transcribe_kwargs["condition_on_previous_text"] = False
+                transcribe_kwargs["repetition_penalty"] = 1.1
             segments, info = active_model.transcribe(
                 audio_input,
-                language=lang if lang != "auto" else None,
-                initial_prompt=speech_prompt,
-                beam_size=5,
-                vad_filter=True,
+                **transcribe_kwargs,
             )
-            return " ".join(segment.text.strip() for segment in segments).strip()
+            result_text = " ".join(segment.text.strip() for segment in segments).strip()
+            if speech_prompt and result_text.lower().rstrip('.!?।') == speech_prompt.lower().rstrip('.!?।'):
+                result_text = ""
+            return result_text
 
     try:
         full_text = await asyncio.to_thread(run_transcription)

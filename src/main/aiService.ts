@@ -359,8 +359,42 @@ async function runOllamaPrompt(prompt: string, ollamaUrl: string, model: string,
   return (json.response || '').trim();
 }
 
-function localFormat(rawText: string, context: WindowContext): string {
-  let cleaned = rawText.trim();
+const ALLOWED_REDUPLICATIONS = new Set([
+  'bye', 'no', 'haan', 'kabhi', 'dheere', 'saath', 'paas', 'chhota', 'chhoti', 'chote',
+  'baar', 'ghante', 'kya', 'kaun', 'dur', 'door', 'alag', 'naye', 'naya', 'nayi',
+  'batao', 'bolo', 'sun', 'suno', 'are', 'arre', 'arey', 'really', 'very'
+]);
+
+export function cleanSpeechDisfluencies(text: string): string {
+  if (!text) return '';
+  let cleaned = text.normalize('NFC').trim();
+
+  // 1. Collapse 3+ identical consecutive words/tokens down to 1 (Whisper infinite loops or extreme stutters)
+  cleaned = cleaned.replace(/(?<=^|[\s,.;:!?।])([\p{L}\p{M}\p{N}]+)(?:[,\s]+\1(?=[,\s.;:!?।]|$)){2,}/giu, '$1');
+
+  // 2. Remove standalone speech filler sounds (um, uh, umm, uhh, er, ah, hmm, अं, उम्, हम्म)
+  cleaned = cleaned.replace(/(?<=^|[\s,.;:!?।])(?:um+|uh+|umm+|uhh+|er+|ah+|hmm+|अं+|उम्+|हम्म+)(?=[,\s.;:!?।]|$)[,\s]*/giu, ' ');
+
+  // 3. Collapse 2 identical consecutive words unless they are known natural reduplications (e.g. "data data" -> "data")
+  cleaned = cleaned.replace(/(?<=^|[\s,.;:!?।])([\p{L}\p{M}\p{N}]+)(?:[,\s]+)(\1)(?=[,\s.;:!?।]|$)/giu, (match, word1, word2) => {
+    if (ALLOWED_REDUPLICATIONS.has(word1.toLowerCase())) {
+      return `${word1} ${word2}`;
+    }
+    return word1;
+  });
+
+  // 4. Clean messy whitespace and punctuation artifacts
+  cleaned = cleaned
+    .replace(/[,\s]*([.!?।])+/gu, '$1')
+    .replace(/^[,\s;:]+/u, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return cleaned;
+}
+
+export function localFormat(rawText: string, context: WindowContext): string {
+  let cleaned = cleanSpeechDisfluencies(rawText);
   if (!cleaned) return '';
   if (store.getSettings().writingStyle === 'code' || writingCategory(context) === 'code') return cleaned;
   cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
