@@ -5,7 +5,7 @@
 <h3 align="center">Free, offline voice typing for any Windows app. No account, no subscription.</h3>
 
 <!-- Demo GIF goes here (20 seconds: press shortcut, speak, text lands in VS Code or Slack):
-<p align="center"><img src="docs/assets/demo.gif" alt="OwliO demo" width="720"></p>
+<p align="center"><img src="docs/assets/demo.gif" alt="Owlio demo" width="720"></p>
 -->
 
 <p align="center">
@@ -23,9 +23,9 @@ It runs **local speech models (Whisper, Bodhan Flex and Parakeet TDT)** on your 
 
 **Use it as a guest.** Owlio needs no account. In guest mode every local feature works and no usage data is sent. Signing in is optional.
 
-### OwliO vs Wispr Flow
+### Owlio vs Wispr Flow
 
-| | OwliO | Wispr Flow |
+| | Owlio | Wispr Flow |
 | --- | --- | --- |
 | Price | Free | Paid subscription, limited free plan |
 | Works offline | Yes, with local models | No, cloud processing |
@@ -121,7 +121,7 @@ Pre-built Windows 64-bit installers are published on the official [GitHub Releas
 
 | File | Platform | Architecture | SHA-256 Checksum |
 | :--- | :--- | :--- | :--- |
-| **[Owlio-Setup-1.0.23.exe](https://github.com/theshubzworld/OwliO/releases/download/v1.0.23/Owlio-Setup-1.0.23.exe)** | Windows 10 / 11 | x64 | `81FCD48AC7EEECD15AB9E45A26B013DD5D6E4A41D8194F1AB8D98F0E85B217EB` |
+| **[Owlio-Setup-1.0.24.exe](https://github.com/theshubzworld/OwliO/releases/download/v1.0.24/Owlio-Setup-1.0.24.exe)** | Windows 10 / 11 | x64 | `B1829BED93FA15BD512F07748883DE5597EAD33102918C0670DDB154C61620B8` |
 
 > **Note on Windows SmartScreen**: The installer is currently unsigned. If Windows SmartScreen displays a warning, click *More info* → *Run anyway*. You can verify the published SHA-256 hash above against your download.
 
@@ -133,7 +133,7 @@ Pre-built Windows 64-bit installers are published on the official [GitHub Releas
 [ Your Voice ] ──> [ Floating Companion / Shortcut ] ──> [ Local Whisper (CPU/GPU) ] ──> [ Text Inserted in Active App ]
 ```
 
-1. **Trigger**: Press your customizable shortcut (default: `Win + Space` or `F8`) or click the floating companion.
+1. **Trigger**: Press your customizable shortcut (default: `F8`) or click the floating companion.
 2. **Speak**: Talk naturally. The companion displays real-time soundwave feedback and listening status.
 3. **Insert**: Release the shortcut or finish speaking. Owlio processes the audio locally and automatically types the formatted text into your cursor position.
 
@@ -169,7 +169,8 @@ To build and run Owlio locally on your development machine:
 
 ### Prerequisites
 - Windows 10 / 11 (x64)
-- [Node.js](https://nodejs.org/) (v18 or v20 LTS recommended)
+- [Node.js](https://nodejs.org/) 20.19+ or 22.12+
+- [Python](https://www.python.org/) 3.11 for the local speech server (`npm run server:install`, then `npm run server`)
 - [git](https://git-scm.com/)
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (for the Windows helper service)
 
@@ -186,7 +187,7 @@ npm ci
 # 3. Build the Electron application and TypeScript bundles
 npm run build
 
-# 4. Start Owlio in development mode
+# 4. Start the built app
 npm start
 ```
 
@@ -216,7 +217,7 @@ Packaged outputs will be created in `release-artifacts/<version>/`. See the [Dev
    git checkout -b feature/my-amazing-feature
    ```
 2. Make your improvements with clean, readable code.
-3. Run type verification and build:
+3. Run the type check and build (the automated test suite is not published yet):
    ```bash
    npm run typecheck
    npm run build
@@ -230,7 +231,8 @@ Packaged outputs will be created in `release-artifacts/<version>/`. See the [Dev
 
 - **Application Code**: Licensed under the [MIT License](LICENSE).
 - **Model Weights**: Speech checkpoints retain their respective licenses; some, including Bodhan Flex, have custom use restrictions. See [model links and license notes](#model-links-and-licenses).
-- Bundled third-party components and notices are documented in [`vendor/`](vendor/).
+- **Bundled Components**: The installer includes `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` (Electron, React, Supabase and other packages; regenerate with `npm run notices`). Bundled Bodhan Flex inference code is Apache-2.0; see [`vendor/bodhan_flex/`](vendor/bodhan_flex/).
+- Speech models downloaded by Owlio (Whisper, Parakeet, Bodhan Flex and others) are not part of the MIT-licensed software and keep their own licenses. See [speech model notices](docs/speech-model-notices.md).
 
 ---
 
