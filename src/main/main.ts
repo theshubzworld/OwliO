@@ -102,7 +102,9 @@ function createPillWindow() {
     y,
     frame: false,
     transparent: true,
-    alwaysOnTop: true,
+    // Keep the idle companion in the normal window stack so it does not cover
+    // video players or other foreground apps. Dictation raises it temporarily.
+    alwaysOnTop: false,
     skipTaskbar: true,
     resizable: false,
     hasShadow: false,
@@ -130,7 +132,7 @@ function createPillWindow() {
     pillWindow.loadFile(prodPath, { query: { view: 'pill' } });
   }
 
-  pillWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  pillWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
   pillWindow.setIgnoreMouseEvents(true, { forward: true });
   const window = pillWindow;
   window.once('ready-to-show', () => showPillWindow());
@@ -187,9 +189,10 @@ function showPillWindow(reposition = false) {
     pillWindow.setBounds({ x: area.x + Math.round((area.width - width) / 2), y: area.y + area.height - height - pillBottomGap, width, height });
   }
   if (pillWindow.isMinimized()) pillWindow.restore();
-  pillWindow.setAlwaysOnTop(true, 'screen-saver');
+  const dictationInProgress = activeSession !== null;
+  pillWindow.setAlwaysOnTop(dictationInProgress, 'floating');
   pillWindow.showInactive();
-  pillWindow.moveTop();
+  if (dictationInProgress) pillWindow.moveTop();
   pillWindow.webContents.invalidate();
 }
 
