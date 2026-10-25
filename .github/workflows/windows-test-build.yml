@@ -1,0 +1,47 @@
+name: Windows test build
+
+# Builds an unsigned Windows installer so changes can be tried without a local build setup.
+# Download the installer from the run's "Artifacts" section. Test builds are not releases.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Set up .NET 8 for the Windows helper
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Mark this as a test version
+        shell: bash
+        run: npm version "1.0.24-test.${{ github.run_number }}" --no-git-tag-version
+      - name: Install dependencies
+        run: npm ci
+      - name: Build the installer
+        run: npm run package
+      - name: Record the checksum
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem release-artifacts -Recurse -Filter "Owlio-Setup-*.exe" | Select-Object -First 1
+          $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash
+          "$($exe.Name)  SHA-256: $hash" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: owlio-windows-test-installer
+          path: release-artifacts/**/Owlio-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 14

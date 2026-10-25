@@ -28,8 +28,9 @@ function run(command, args, cwd = root) {
   npm('build:renderer');
   // Reject private keys or extra fields before cloud config enters an installer.
   const cloudConfig=path.join(root,'cloud-config.json');
-  if(!fs.existsSync(cloudConfig)) throw Error('The official app requires cloud-config.json for mandatory sign-in.');
-  require('../dist/main/cloudConfig').validateCloudConfig(JSON.parse(fs.readFileSync(cloudConfig,'utf8')));
+  // Guest mode: accounts are optional, so a build without cloud-config.json is a valid guest-only installer.
+  if(fs.existsSync(cloudConfig)) require('../dist/main/cloudConfig').validateCloudConfig(JSON.parse(fs.readFileSync(cloudConfig,'utf8')));
+  else console.warn('No cloud-config.json found: building a guest-only installer with optional accounts unavailable.');
   const files = await build({ projectDir: root, targets: Platform.WINDOWS.createTarget(['nsis'], Arch.x64),
     config: { ...pkg.build, directories: { ...pkg.build.directories, output }, electronDist: path.join(root, 'node_modules/electron/dist'),
       extraResources: pkg.build.extraResources.filter(resource => resource.to !== 'windows-helper'),
