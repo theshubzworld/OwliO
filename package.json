@@ -1,7 +1,7 @@
 {
   "name": "owlio",
   "productName": "Owlio",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "description": "Ultra-fast, context-aware AI voice dictation for Windows",
   "main": "dist/main/main.js",
   "scripts": {
