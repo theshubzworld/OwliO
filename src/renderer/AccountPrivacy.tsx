@@ -48,12 +48,12 @@ export function UsageConsent({ compact = false }: { compact?: boolean }) {
     return () => { active = false; clearInterval(timer); unsubscribe(); };
   }, []);
   return <section className="card usage-consent" aria-labelledby="usage-consent-heading">
-    <div className="shortcut-heading"><ShieldCheck size={20}/><h3 id="usage-consent-heading">Required basic usage reporting</h3></div>
-    <p>Owlio is free to use with an account and acceptance of its Terms of Use. Basic reporting is a condition of using the official app.</p>
+    <div className="shortcut-heading"><ShieldCheck size={20}/><h3 id="usage-consent-heading">Basic usage reporting</h3></div>
+    <p>Owlio is free to use as a guest, with no account and no usage reporting. Basic reporting applies only if you sign in and accept the Terms of Use.</p>
     <p className="muted">Reporting includes activity counts, model and language categories, processing times, audio duration, word counts, app and Windows versions, and success or failure counts.</p>
     <p className="muted">No audio, dictated or selected text, commands, API keys, window titles, or account email is included in usage events. Events use a random installation ID and expire after 90 days.</p>
-    <p className="muted">Reporting starts only after sign-in and terms acceptance. Sign out to stop reporting and lock app access. Account and acceptance records are stored separately.</p>
-    {!compact && <p className="muted" role="status">{!status ? 'Checking reporting status…' : status.enabled ? `Reporting active · ${status.queued} events waiting` : 'Reporting paused until account access and terms acceptance are verified.'}</p>}
+    <p className="muted">Reporting starts only after sign-in and terms acceptance. Sign out to stop reporting and keep using Owlio as a guest. Account and acceptance records are stored separately.</p>
+    {!compact && <p className="muted" role="status">{!status ? 'Checking reporting status…' : status.enabled ? `Reporting active · ${status.queued} events waiting` : 'No usage is reported. Guest mode never reports usage.'}</p>}
   </section>;
 }
 
@@ -64,13 +64,13 @@ function TermsAgreement({ status, busy, accept }: { status: AccountStatus | null
   return <section className="card terms-agreement" aria-labelledby="terms-heading">
     <h3 id="terms-heading">{accepted ? 'Your agreement' : 'Review and accept to continue'}</h3>
     {!LEGAL_REVIEWED && <p className="account-notice">Draft preview — these documents are awaiting owner review before public release.</p>}
-    <p>Free access requires sign-in, agreement to the Terms of Use, and acknowledgement of the Privacy Notice and required basic usage reporting.</p>
+    <p>Using your account requires agreement to the Terms of Use and acknowledgement of the Privacy Notice and basic usage reporting. You can sign out at any time and keep using Owlio as a guest.</p>
     {[TERMS_DOCUMENT, PRIVACY_DOCUMENT].map(doc => <details key={doc.title} className="settings-disclosure legal-document">
       <summary>{doc.title} · {doc.version}</summary>
       <div className="legal-document-body">{doc.sections.map(section => <section key={section.title}><h4>{section.title}</h4><p>{section.text}</p></section>)}</div>
     </details>)}
-    {accepted ? <p role="status">Accepted version {TERMS_VERSION}{status?.access?.acceptedAt ? ' on ' + new Date(status.access.acceptedAt).toLocaleString() : ''}. Signing out locks access.</p> : <>
-      <label className="usage-choice"><input id="terms-acceptance" type="checkbox" checked={confirmed} disabled={busy || !status?.user || status.access?.blocked} onChange={event => setConfirmed(event.target.checked)}/><span>I accept the Terms of Use and acknowledge the Privacy Notice, including required basic usage reporting as a condition of free app access.</span></label>
+    {accepted ? <p role="status">Accepted version {TERMS_VERSION}{status?.access?.acceptedAt ? ' on ' + new Date(status.access.acceptedAt).toLocaleString() : ''}. Signing out returns you to guest mode.</p> : <>
+      <label className="usage-choice"><input id="terms-acceptance" type="checkbox" checked={confirmed} disabled={busy || !status?.user || status.access?.blocked} onChange={event => setConfirmed(event.target.checked)}/><span>I accept the Terms of Use and acknowledge the Privacy Notice, including basic usage reporting while I am signed in.</span></label>
       <button className="btn btn-primary" id="accept-terms" disabled={!confirmed || busy || !status?.user || status.access?.blocked} onClick={accept}>{busy ? 'Saving…' : 'Accept and continue'}</button>
       {!status?.user && <p className="muted">Sign in first. Acceptance is saved against your signed-in account.</p>}
     </>}
@@ -136,17 +136,17 @@ export function AccountPrivacy({
   return (
     <div className="settings-page account-page">
       <div className="settings-page-heading">
-        <span className="settings-eyebrow">Free app · Account required</span>
+        <span className="settings-eyebrow">Free app · Account optional</span>
         <h1>Account &amp; privacy</h1>
         <p>
-          Sign in and accept the Terms of Use, Privacy Notice and required basic usage reporting to use Owlio for free.
+          Owlio works without an account. Sign in only if you want an account; signing in means accepting the Terms of Use, Privacy Notice and basic usage reporting.
         </p>
       </div>
       <section className="card account-card" aria-labelledby="account-heading">
         <div className="shortcut-heading">
           <UserRound size={20} />
           <h3 id="account-heading">
-            {status?.user ? 'Your account' : 'Sign in to Owlio'}
+            {status?.user ? 'Your account' : 'Sign in (optional)'}
           </h3>
         </div>
         {!status ? (
@@ -163,7 +163,7 @@ export function AccountPrivacy({
                   {status.access.reason ||
                     'The administrator has suspended access for this account.'}
                 </p>
-                <p>Contact the administrator to restore access. Signing out does not enable guest use.</p>
+                <p>Contact the administrator to restore access, or sign out to continue as a guest.</p>
               </div>
             )}
             {status.access?.offline && (
@@ -197,7 +197,7 @@ export function AccountPrivacy({
           <>
             {!status.configured && (
               <p className="account-notice">
-                Account services are unavailable in this build. Sign-in is required; app access remains locked.
+                Account services are unavailable in this build. Owlio still works as a guest.
               </p>
             )}
             <button
@@ -353,7 +353,7 @@ export function AccountPrivacy({
         )}
       </section>
       {status?.user && accountAccessError(status) && !status.access?.blocked && <p className="account-notice" role="status">{accountAccessError(status)}</p>}
-      <TermsAgreement status={status} busy={busy} accept={() => { void run(async () => { const next = await api().acceptTerms(true); if (mounted.current) setStatus(next); }); }}/>
+      {status?.user && <TermsAgreement status={status} busy={busy} accept={() => { void run(async () => { const next = await api().acceptTerms(true); if (mounted.current) setStatus(next); }); }}/>}
       {status?.user && <button className="btn btn-secondary" disabled={busy} onClick={() => { void run(async () => { const next = await api().refreshAccountAccess(); if (mounted.current) setStatus(next); }); }}>Refresh account access</button>}
       {!accountAccessError(status) && <button className="btn btn-secondary account-continue" disabled={busy} onClick={onContinue}>Back to dictation</button>}
       <UsageConsent />
@@ -368,7 +368,7 @@ export function AccountPrivacy({
         </p>
         <button
           className="btn btn-secondary"
-          disabled={busy || !!accountAccessError(status)}
+          disabled={busy || !status?.user || !!accountAccessError(status)}
           onClick={onAdmin}
         >
           Open admin dashboard

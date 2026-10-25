@@ -141,7 +141,8 @@ Speech models download on demand and can be stored on any drive you specify in *
 - **Audio Stays on Your Machine**: When using local Whisper models, all audio processing occurs exclusively on your CPU or GPU. No voice recordings are ever sent to remote servers.
 - **Local Profile Storage**: Dictation history, personal dictionary entries, drafts, and custom snippets live inside your private Windows user profile (`%APPDATA%/Owlio`).
 - **Optional Cloud AI**: Cloud speech recognition (Groq) or AI writing polish (Gemini / Ollama) is strictly opt-in and uses your own API keys.
-- **Disclosed Telemetry**: The official build includes basic reliability events (app launch, crash diagnostics) to maintain stability. Content such as audio, transcribed text, API keys, and email addresses are strictly excluded. Read our full [Privacy Notice](https://theshubzworld.github.io/OwliO/legal/privacy-notice.html).
+- **Guest Mode by Default**: No account, no sign-in and no usage reporting are needed to use every local feature.
+- **Optional Account**: If you choose to sign in, basic usage counts (activity, model and language categories, processing times, audio duration, word counts, app and Windows versions) are reported for that account. Audio, transcribed text, API keys, and email addresses are never included. Signing out returns you to guest mode. Read our full [Privacy Notice](https://theshubzworld.github.io/OwliO/legal/privacy-notice.html) and [account details](docs/accounts-analytics.md).
 
 ---
 
