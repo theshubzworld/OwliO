@@ -1,6 +1,8 @@
-# Required sign-in, terms acceptance and basic usage reporting
+# Guest mode, optional sign-in and account usage reporting
 
-The official app is free and works in **guest mode**: with no account, every local feature is available and **no usage reporting is collected**. Signing in is optional. If you sign in, you must accept the versioned Terms of Use and the Privacy Notice, and basic usage reporting runs for that account. Signing in alone does not accept the terms or enable reporting. Signing out returns you to guest mode and stops collection. There is no billing or payment collection. Existing installed 1.0.15 binaries retain their earlier optional-account behavior; this source update cannot retroactively change those binaries.
+**Guest mode (1.0.24+):** Owlio is free and works with no account. Without a signed-in account, every local feature is available and **no usage data is reported**. Builds without `cloud-config.json` (including forks) run in guest mode out of the box.
+
+Signing in is optional. A signed-in account must explicitly accept the versioned Terms of Use and Privacy Notice; basic usage reporting then applies to that account. Signing in alone does not accept the terms or enable reporting. Signing out stops collection, clears the queue and returns the app to guest mode. A signed-in account that is suspended, has not accepted the current terms, or has an expired access cache is asked to fix that or sign out to continue as a guest. The owner dashboard is available only to signed-in administrators. There is no billing or payment collection. Existing installed 1.0.15 binaries retain their earlier optional-account behavior; this source update cannot retroactively change those binaries.
 
 **Release 1.0.16:** [Terms of Use](legal/terms-of-use.md) and [Privacy Notice](legal/privacy-notice.md), version `2026-10-23`, govern the free official app. Earlier draft documents are retained for history. The final policy is a separate immutable version and hash. No existing user is auto-accepted. The installer retains checks against draft legal documents and overwriting an existing installer.
 
@@ -21,7 +23,7 @@ Copy `cloud-config.example.json` to `cloud-config.json` at the repository root a
 
 This file is ignored by Git and included in installer builds. The values are public configuration, not an authorization boundary. **Never put the service-role key, an `sb_secret_` key, database password, SMTP password or Google client secret in the desktop app.** Validation rejects service-role/secret keys.
 
-Missing or invalid config keeps the official app locked and explains that account services are unavailable. Removing config cannot enable guest use. Forks can configure their own backend; modifications to the source are governed by its software licence.
+Missing or invalid config disables account services and the app runs in guest mode with no reporting. Forks can configure their own backend. The application source is MIT licensed (see `LICENSE`); speech model weights keep their own licenses.
 
 ## 2. Apply the database migrations
 
@@ -150,13 +152,13 @@ For subsequent releases, review any document changes and activate the matching p
 
 Local tests cover the real Postgres migration functions using PGlite with Supabase Auth role/UID stubs, encryption, versioned acceptance, mandatory-reporting gates and queue behavior, mocked authentication, and renderer flows in Electron. They do not establish live Google, SMTP, hosted Supabase or PostHog connectivity. After creating your projects, verify:
 
-1. Fresh profile and upgrades: sign-in is required. Neither signing in alone nor a previously enabled reporting flag unlocks features or sends events before current terms acceptance. The acceptance checkbox starts unchecked.
+1. Fresh profile and upgrades: the app works as a guest and sends no usage events. Neither signing in alone nor a previously enabled reporting flag sends events before current terms acceptance. The acceptance checkbox starts unchecked.
 2. Email: default link arrives and opens back into the app; with a code template, wrong codes fail and correct codes sign in. Restart restores the encrypted session and sign-out works offline.
 3. Google: browser opens, callback completes, cancel/timeout leaves no signed-in session.
 4. A member cannot read admin reports or change access. Your SQL-authorized admin can.
-5. Suspend a disposable member account; its connected app stops processing after the next check. Restore it; signing out must still lock app access.
-6. Before acceptance and after sign-out, no usage HTTP requests occur. After acceptance, reporting is required; an attempt to toggle the old consent IPC is rejected. Inspect event properties to confirm there is no text/audio/email/key.
-7. Disconnect: only the valid 24-hour access cache permits local features. Queue events within bounds (200 / seven days). Sign out: pending sends abort and the queue clears. Test missing/expired cache, a different account, and updated policy versions; none may unlock the app.
+5. Suspend a disposable member account; its connected app stops processing after the next check. Restore it. Signing out returns the app to guest mode with no reporting.
+6. As a guest, before acceptance and after sign-out, no usage HTTP requests occur. After acceptance, reporting applies to the signed-in account; an attempt to toggle the old consent IPC is rejected with a pointer to guest mode. Inspect event properties to confirm there is no text/audio/email/key.
+7. Disconnect: only the valid 24-hour access cache permits local features. Queue events within bounds (200 / seven days). Sign out: pending sends abort and the queue clears. Test missing/expired cache, a different account, and updated policy versions; none may start reporting, and each offers sign-out to continue as a guest.
 
 Internal automated email/admin verification tools and their temporary profiles are maintained locally and are not part of the public source. Use the checklist above to verify your deployment.
 

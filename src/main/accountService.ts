@@ -135,14 +135,14 @@ export class AccountService extends EventEmitter {
       if (generation === this.generation)
         this.update({
           error:
-            'Your saved account could not be connected. Reconnect and sign in to use Owlio.'
+            'Your saved account could not be connected. Reconnect and sign in, or sign out to continue as a guest.'
         });
     }
   }
   private requireClient(): SupabaseClient {
     if (!this.client)
       throw Error(
-        'Account services are not configured for this build. Sign-in is required to use Owlio.'
+        'Account services are not configured for this build. Owlio runs in guest mode without an account.'
       );
     return this.client;
   }

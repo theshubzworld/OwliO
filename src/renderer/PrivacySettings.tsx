@@ -19,8 +19,8 @@ export function PrivacySettings() {
         <dd>When correction learning is enabled, Owlio checks edits in the same focused field for up to 30 seconds after pasting. With Gemini Writing AI configured, changed spelling candidates are sent for review. Password fields are excluded. Other suggestions wait for your approval in Dictionary.</dd>
         <dt><strong>Saved data</strong></dt>
         <dd>History, writing rules and vocabulary are saved on this computer. Audio is retained when Save audio recordings is enabled. API keys use Windows encryption. Cloud providers apply their own data policies and usage limits.</dd>
-        <dt><strong>Required account, agreement and basic usage reporting</strong></dt>
-        <dd>Sign-in and accepted Terms of Use are required for the free official app. Basic reporting starts after acceptance and shares counts, timings and feature categories with a random installation ID, without your audio, text or account email in usage events. Account and agreement records are stored separately. Signing out stops reporting and locks app access. Read the documents in Account &amp; privacy.</dd>
+        <dt><strong>Optional account and usage reporting</strong></dt>
+        <dd>Owlio works with no account: in guest mode no usage data is sent. If you sign in and accept the Terms of Use, basic reporting starts after acceptance and shares counts, timings and feature categories with a random installation ID, without your audio, text or account email in usage events. Account and agreement records are stored separately. Signing out stops reporting and returns you to guest mode. Read the documents in Account &amp; privacy.</dd>
       </dl>
     </details>
   </section>;
