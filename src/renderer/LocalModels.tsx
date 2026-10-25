@@ -149,6 +149,7 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
           )}
         </div>
         <p className="muted">{modelLanguageSummary(selected,model?.languages)}</p>
+        {selected==='bodhan-flex'&&<p className="muted">Built with Bodhan Flex from Bodhan AI / AI4Bharat. <a href="https://github.com/Bodhan-AI/bodhan-model-info/blob/main/licenses/indic-open-model-license/v1/Indic_Open_Model_License.md" target="_blank" rel="noreferrer">Model license</a></p>}
         {model?.engine==='parakeet-tdt'&&<p className="muted">Transcribes speech as spoken, including fillers. Writing cleanup and dictionary replacements apply afterward; vocabulary prompts are unavailable for this model.</p>}
         {!!selectedLanguages?.length&&settings.dictationLanguage!=='auto'&&!modelHasDocumentedLanguage({id:selected,languages:selectedLanguages},settings.dictationLanguage)&&<p className="model-warning" role="alert">This model does not document support for {languageName(settings.dictationLanguage)}. Choose a compatible model before saving.</p>}
         {!!selectedLanguages?.length&&settings.dictationLanguage==='auto'&&selectedLanguages.length<99&&<p className="muted">Automatic detection is limited to this model’s listed languages.</p>}

@@ -76,6 +76,26 @@ Advanced Hugging Face imports accept CTranslate2 Whisper, Transformers Whisper, 
 
 Source: [Bark Pro model card](https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Pro). The recommended checkpoint is pinned to revision `4b5c51e04aa8d16dda9ecdff71bc29f7360149e4`; its CC-BY-4.0 attribution is documented in [speech model notices](docs/speech-model-notices.md) and downloaded with the weights.
 
+### Model links and licenses
+
+The links below open the publishers' model pages. Built-in models are selected under **Speech & models**. For a custom Hinglish checkpoint, open **Advanced models**, paste its model-page URL and choose **Download URL**; a Full speech package is required for Transformers checkpoints. Model weights download separately and keep their own license terms.
+
+| Model / download page | Use in Owlio | Publisher-declared license |
+| --- | --- | --- |
+| Whisper [tiny](https://huggingface.co/Systran/faster-whisper-tiny), [base](https://huggingface.co/Systran/faster-whisper-base), [small](https://huggingface.co/Systran/faster-whisper-small), [medium](https://huggingface.co/Systran/faster-whisper-medium), [large-v3](https://huggingface.co/Systran/faster-whisper-large-v3) | Built-in multilingual options; language coverage depends on the checkpoint. | MIT, as declared by these converted repositories; retain applicable upstream notices. |
+| [Whisper large-v3 turbo](https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo) | Built-in **Whisper large v3 turbo**. | MIT |
+| [Underdog Bark 3.0 Pro](https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Pro) | Built-in English-only option; no Hindi/Hinglish support. | [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/legalcode.en); attribution required when sharing the model. |
+| [Bodhan Flex](https://huggingface.co/bodhan-ai/indic-transcribe-flex) | Built-in option for 27 documented languages; request Hugging Face access and use an approved read token. | [Indic Open Model License v1.0](https://github.com/Bodhan-AI/bodhan-model-info/blob/main/licenses/indic-open-model-license/v1/Indic_Open_Model_License.md), plus upstream terms. |
+| [Mayank Hinglish turbo](https://huggingface.co/mayank-dubey-ai/whisper-large-v3-turbo-hinglish) | Import by URL for Hindi/English and Hinglish dictation. | Apache-2.0 |
+| [Oriserve Hindi2Hinglish Apex](https://huggingface.co/Oriserve/Whisper-Hindi2Hinglish-Apex) | Import by URL for Hindi/English and Hinglish dictation. | Apache-2.0 |
+| [Trelis Hinglish preview](https://huggingface.co/Trelis/whisper-hinglish-preview) | Import by URL for Hindi, English and mixed Hindi-English speech. | Apache-2.0 |
+
+**License essentials:** [MIT](https://github.com/openai/whisper/blob/main/LICENSE) requires retaining its copyright and permission notice when distributing copies. [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) requires the license, applicable notices and change notices for modified files when redistributing. CC-BY-4.0 requires appropriate credit, a license link and modification disclosure when sharing. These licenses allow commercial use subject to their terms; publisher declarations are not a separate audit of training data or upstream rights.
+
+**Bodhan Flex has additional conditions.** Built with Bodhan Flex from Bodhan AI / AI4Bharat. Its custom license permits local/commercial use subject to its terms, requires user-facing attribution when made available, restricts direct third-party hosting/API access unless approved or exempt, preserves the same license for distributed derivatives, and includes prohibited-use rules. Section 14 requires a separate license above 500 million monthly active users or US$250 million annual revenue, except for eligible public-interest entities. The upstream [NVIDIA Canary-1b-v2](https://huggingface.co/nvidia/canary-1b-v2) terms also apply. It must not be described as an unrestricted MIT/Apache model.
+
+License declarations and primary terms reviewed on **25 October 2026**. See [model notices and upstream attribution](docs/speech-model-notices.md) for scope and details. Import support does not grant permission to use an arbitrary model.
+
 ---
 
 ## 📥 Download
@@ -191,7 +211,7 @@ Packaged outputs will be created in `release-artifacts/<version>/`. See the [Dev
 ## 📄 License & Acknowledgements
 
 - **Application Code**: Licensed under the [MIT License](LICENSE).
-- **Open-Weights Models**: Third-party speech recognition checkpoints (OpenAI Whisper, Bodhan Flex, etc.) retain their respective open-source licenses and model weight terms.
+- **Model Weights**: Speech checkpoints retain their respective licenses; some, including Bodhan Flex, have custom use restrictions. See [model links and license notes](#model-links-and-licenses).
 - Bundled third-party components and notices are documented in [`vendor/`](vendor/).
 
 ---
