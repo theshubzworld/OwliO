@@ -139,7 +139,7 @@ export const DashboardApp: React.FC = () => {
     instructModeEnabled: false,
     minAudioDurationMs: 300,
     microphoneDeviceId: '',
-    dictationLanguage: 'hinglish',
+    dictationLanguage: 'en',
     retainAudio: true,
     startWithWindows: false,
   });
@@ -326,9 +326,11 @@ export const DashboardApp: React.FC = () => {
       setSaveError('');
       const patch = Object.fromEntries(allSettingsFields.filter(key=>settings[key]!==savedSettings[key]).map(key => [key, settings[key]]));
       const updated = await (window as any).api.updateSettings(patch);
-      setSavedSettings(updated);
+      const { startupError, ...saved } = updated;
+      setSaveError(startupError ? `Other settings were saved, but Windows startup could not be changed: ${startupError}` : '');
+      setSavedSettings(saved);
       // Apply only fields that still match this save, preserving edits made while it was in flight.
-      setSettings((previous: any) => ({...previous, ...Object.fromEntries(Object.keys(patch).filter(key => previous[key] === patch[key]).map(key => [key, updated[key]]))}));
+      setSettings((previous: any) => ({...previous, ...Object.fromEntries(Object.keys(patch).filter(key => previous[key] === patch[key]).map(key => [key, saved[key]]))}));
     } catch (e) {
       console.error(e);
       setSaveError(e instanceof Error ? e.message : 'Settings could not be saved.');
@@ -1446,7 +1448,7 @@ export const DashboardApp: React.FC = () => {
                 aria-label="Spoken language"
                 aria-describedby="spoken-language-help spoken-language-detail"
                 className="select"
-                value={settings.dictationLanguage || 'hinglish'}
+                value={settings.dictationLanguage || 'en'}
                 disabled={choosingLanguage}
                 onChange={event=>void chooseSpokenLanguage(event.target.value)}
               >

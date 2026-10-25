@@ -104,7 +104,7 @@ Pre-built Windows 64-bit installers are published on the official [GitHub Releas
 
 | File | Platform | Architecture | SHA-256 Checksum |
 | :--- | :--- | :--- | :--- |
-| **[Owlio-Setup-1.0.22.exe](https://github.com/theshubzworld/OwliO/releases/download/v1.0.22/Owlio-Setup-1.0.22.exe)** | Windows 10 / 11 | x64 | `16998582CBAE7AB4242AD951C8D249C73AAF22E7C76D18869327198E7C101908` |
+| **[Owlio-Setup-1.0.23.exe](https://github.com/theshubzworld/OwliO/releases/download/v1.0.23/Owlio-Setup-1.0.23.exe)** | Windows 10 / 11 | x64 | `81FCD48AC7EEECD15AB9E45A26B013DD5D6E4A41D8194F1AB8D98F0E85B217EB` |
 
 > **Note on Windows SmartScreen**: The installer is currently unsigned. If Windows SmartScreen displays a warning, click *More info* → *Run anyway*. You can verify the published SHA-256 hash above against your download.
 

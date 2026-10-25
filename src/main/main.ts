@@ -374,7 +374,7 @@ app.whenReady().then(() => {
   });
   createPillWindow();
   // Always show the required account/terms gate on launch, including upgrades.
-  createDashboardWindow();
+  createDashboardWindow(undefined, process.argv.includes('--startup'));
   setupTray();
   setupHelperListeners();
   void meetingCaptures.list().catch(error => console.error('Meeting recovery cleanup failed:', error));
@@ -696,14 +696,26 @@ app.whenReady().then(() => {
         if(checkingWriter&&(!catalogue.formatting.online||!catalogue.formatting.models?.some((model:any)=>model.name===target.localLlmModel||model.name===target.localLlmModel+':latest'))) throw new Error('Start Ollama and install the selected Writing AI model before enabling voice rewrites.');
       } finally {switchingModel=false;}
     }
-    const updated = windowsStartup.settings(windowsStartup.save(newSettings.startWithWindows, () => store.updateSettings(newSettings)));
+    const { startWithWindows, ...settingsPatch } = newSettings;
+    let updated = store.updateSettings(settingsPatch);
+    let startupError: string | undefined;
+    if (startWithWindows !== undefined) {
+      try {
+        updated = windowsStartup.save(startWithWindows, () => store.updateSettings({ startWithWindows }));
+      } catch (error) {
+        // A Windows Startup registration failure must not discard unrelated
+        // settings from the same Save action (for example a downloaded model).
+        startupError = (error as Error).message;
+      }
+    }
+    updated = windowsStartup.settings(updated);
     if(!current.setupCompleted&&updated.setupCompleted)captureMetric('setup_completed');
     if (newSettings.hotkey || newSettings.mode) {
       helperBridge.updateHotkey(updated.hotkey, updated.mode);
     }
     notifyPill({ hotkey: updated.hotkey, mode: updated.mode, microphoneDeviceId: updated.microphoneDeviceId, barDesign: updated.barDesign });
     if (updated.autoLearnCorrections === false) { learningTargets.clear(); helperBridge.cancelLearning(); }
-    return updated;
+    return startupError ? { ...updated, startupError } : updated;
   });
 
   ipcMain.handle('get-dictionary', () => store.getDictionary());

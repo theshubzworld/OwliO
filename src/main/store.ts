@@ -127,7 +127,7 @@ const DEFAULT_DATA: AppData = {
     instructModeEnabled: false,
     minAudioDurationMs: 300,
     microphoneDeviceId: '',
-    dictationLanguage: 'hinglish',
+    dictationLanguage: 'en',
     retainAudio: true,
     startWithWindows: false,
   },

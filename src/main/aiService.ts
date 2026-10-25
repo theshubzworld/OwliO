@@ -71,7 +71,7 @@ export interface ProcessingOptions { romanize?: boolean; signal?: AbortSignal; o
 
 export async function transcribeAudio(wavBuffer: Buffer, context: WindowContext, signal?: AbortSignal): Promise<string> {
   signal?.throwIfAborted();
-  const settings = store.getSettings(), lang = settings.dictationLanguage || 'hinglish';
+  const settings = store.getSettings(), lang = settings.dictationLanguage || 'en';
   if (!wavBuffer || wavBuffer.length < 100) return '';
   if (settings.provider === 'local') return transcribeLocal(wavBuffer, settings.localSttUrl, lang, settings.localSttModel, signal);
   if (settings.provider === 'groq' && settings.groqApiKey) return transcribeGroq(wavBuffer, settings.groqApiKey, lang, signal);

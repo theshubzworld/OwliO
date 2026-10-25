@@ -60,6 +60,22 @@ export function LocalSetupPanel({onConnected,firstRun=false,onFinish,onOpenWizar
   const configured=status?.runtimeConfigured===true;
   useEffect(()=>{const desired=SETUP_MODELS.find(item=>item.id===initialModel);if(!configured&&desired){setModel(desired.id);setPresetChoice('auto');}},[initialModel,configured]);
   const connectedModel=currentModel || status?.connectedModel;
+  // First-run users have not picked a language yet. Bark Pro only supports
+  // English, so choose its compatible language before starting the download.
+  // Existing settings remain explicit.
+  const setupLanguage=initialLanguage || (firstRun&&model==='bark-pro'?'en':undefined);
+  const modelChoices:{label:string;models:readonly (typeof SETUP_MODELS)[number][]}[]=firstRun
+    ? [{label:'Recommended starting points',models:SETUP_MODELS.filter(item=>['base','bark-pro'].includes(item.id))},{label:'More models',models:SETUP_MODELS.filter(item=>!['base','bark-pro'].includes(item.id))}]
+    : [{label:'Speech models',models:SETUP_MODELS}];
+  const modelGuidance:Record<string,string>={
+    tiny:'Whisper Tiny · Multilingual, about 75 MB. The lightest download; may miss more words than larger models.',
+    base:'Whisper Base · Multilingual, about 145 MB. A good balance of speed and capability for most computers.',
+    small:'Whisper Small · Multilingual, about 500 MB. Try it if Base misses words; it uses more memory and runs slower.',
+    turbo:'Whisper Large v3 Turbo · Multilingual, about 1.6 GB. A stronger, faster-decoding option that needs more disk, memory and setup time.',
+    'bark-pro':'Bark 3.0 Pro · English only, about 1.25 GB. Strong English recognition; needs the full speech runtime and can be slow on CPU.',
+    'bodhan-flex':'Bodhan Flex · Covers 27 Indic languages, about 4.9 GB. Requires approved Hugging Face access and a read token.',
+  };
+  const modelCardLinks:Record<string,string>={tiny:'https://huggingface.co/openai/whisper-tiny',base:'https://huggingface.co/openai/whisper-base',small:'https://huggingface.co/openai/whisper-small',turbo:'https://huggingface.co/openai/whisper-large-v3-turbo','bark-pro':'https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Pro','bodhan-flex':'https://huggingface.co/bodhan-ai/indic-transcribe-flex'};
   const connectedPackage=RUNTIME_PRESETS.find(item=>item.id===status?.connectedPreset);
   const connectedModelName=SETUP_MODELS.find(item=>item.id===connectedModel)?.name || connectedModel?.replace(/^hf:/,'');
   const showInstaller=!!status && (!configured || editingPackage);
@@ -75,7 +91,7 @@ export function LocalSetupPanel({onConnected,firstRun=false,onFinish,onOpenWizar
   };
   const start=async(action:SetupAction)=>{
     setRequesting(true);setError('');
-    try{const result=await api().startLocalSetup({action,...(initialLanguage&&['all','model'].includes(action)?{language:initialLanguage}:{}),preset:action==='check'?recommendedPreset(connectedModel||model,status?.connectedPreset):preset,model,token:token.trim()||undefined});acceptStatus(result);setToken('');}
+    try{const result=await api().startLocalSetup({action,...(setupLanguage&&['all','model'].includes(action)?{language:setupLanguage}:{}),preset:action==='check'?recommendedPreset(connectedModel||model,status?.connectedPreset):preset,model,token:token.trim()||undefined});acceptStatus(result);setToken('');}
     catch(error){setError(error instanceof Error?error.message:'Could not start setup.');}
     finally{setRequesting(false);}
   };
@@ -123,9 +139,10 @@ export function LocalSetupPanel({onConnected,firstRun=false,onFinish,onOpenWizar
     {configured&&<><h4>Repair or change your package</h4><p className="muted">Choose a package and model for the repaired setup. Changes apply after verification.</p>
       {connectedModel&&!SETUP_MODELS.some(item=>item.id===connectedModel)&&<p className="muted">This installer does not include your current model, {connectedModelName}. Choose a model below to connect after installation.</p>}</>}
     <div className="setup-fields">
-      <label>{configured?'Model to connect after setup':'Starting speech model'}<select id="setup-model" className="select" aria-label="Setup speech model" value={model} disabled={busy} onChange={event=>{setModel(event.target.value as SetupModel);setPresetChoice('auto');}}>{SETUP_MODELS.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+      <label>{configured?'Model to connect after setup':firstRun?'Choose a speech model':'Starting speech model'}<select id="setup-model" className="select" aria-label="Setup speech model" value={model} disabled={busy} onChange={event=>{setModel(event.target.value as SetupModel);setPresetChoice('auto');}}>{modelChoices.map(group=><optgroup key={group.label} label={group.label}>{group.models.map(m=><option key={m.id} value={m.id}>{firstRun&&m.id==='base'?'Whisper Base · Recommended':firstRun&&m.id==='bark-pro'?'Bark 3.0 Pro · English only · Recommended':m.name}</option>)}</optgroup>)}</select></label>
     </div>
-    <p className="setup-plan">Owlio installs the required speech libraries automatically. {SETUP_MODELS.find(item=>item.id===model)?.size}. {RUNTIME_PRESETS.find(item=>item.id===preset)?.disk}</p>
+    {firstRun&&<p className="muted" aria-live="polite">{modelGuidance[model]||'Choose the speech model that best matches your language and computer.'} <a href={modelCardLinks[model]} target="_blank" rel="noreferrer">Model details</a>. You can change this later in Speech &amp; models.</p>}
+    <p className="setup-plan">Owlio installs the required speech libraries automatically. {SETUP_MODELS.find(item=>item.id===model)?.size}. {RUNTIME_PRESETS.find(item=>item.id===preset)?.disk}{firstRun&&model==='bark-pro'&&!initialLanguage?' Bark Pro uses English, so Owlio will set your spoken language to English.':''}</p>
     {model==='bodhan-flex'?<div className="setup-model-access"><p className="muted">Built with Bodhan Flex from Bodhan AI / AI4Bharat.</p><p className="muted">Bodhan Flex needs approved <a href="https://huggingface.co/bodhan-ai/indic-transcribe-flex" target="_blank" rel="noreferrer">Hugging Face model access</a>. Read the <a href="https://github.com/Bodhan-AI/bodhan-model-info/blob/main/licenses/indic-open-model-license/v1/Indic_Open_Model_License.md" target="_blank" rel="noreferrer">model license</a>. After approval, paste a read token for the download. The token is used only for this setup and is not saved.</p>
       <label>Hugging Face read token<input id="setup-hf-token" type="password" className="input" aria-label="Hugging Face read token" value={token} disabled={busy} onChange={event=>setToken(event.target.value)} autoComplete="off" spellCheck={false} placeholder="hf_…"/></label>
       </div>:null}
