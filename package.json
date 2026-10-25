@@ -41,7 +41,9 @@
       "cloud-config.json",
       "assets/brand/owlio-icon.png",
       "assets/brand/owlio.ico",
-      "package.json"
+      "package.json",
+      "!tests/**",
+      "!release-artifacts/**"
     ],
     "extraResources": [
       {
