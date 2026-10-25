@@ -1,20 +1,20 @@
 # Owlio Terms of Use
 
-Version: 2026-10-23
+Version: 2026-10-26
 
-Document bundle SHA-256: 6f58703940881e9deffe3aea476a03e85d58108aefc00cc1cc395c0ebb5c5dac
+Document bundle SHA-256: b216830434bd11685d455e1e82b582621352f221e4ecf976cd72ac13c05e203e
 
 ## Free access and your agreement
 
-Owlio is currently free. The official app requires an account, acceptance of these Terms, and acknowledgement of the Privacy Notice and required basic usage reporting. No payment card is required. If you do not agree, do not activate the app. Signing in alone does not accept these Terms or start usage reporting.
+Owlio is currently free and works without an account. In guest mode you can use every local feature, and no usage reporting is sent. These Terms apply to your use of the official app. Signing in is optional. If you sign in, you are asked to accept these Terms and the Privacy Notice, including basic usage reporting for your account, before you continue with that account. No payment card is required. Signing in alone does not accept these Terms or start usage reporting.
 
-## Your account and access
+## Optional account and access
 
-Use an email account you control and protect your sign-in access. Administrators may suspend accounts for abuse, attempts to compromise the service, or breaches of these Terms. Suspended accounts cannot use the official app. Signing out locks app access and stops further usage reporting. A previously verified account may use local features offline for up to 24 hours after its last successful access check; reconnect after that period.
+If you sign in, use an email account you control and protect your sign-in access. Administrators may suspend accounts for abuse, attempts to compromise the service, or breaches of these Terms. A suspended account cannot be used in the official app; you can sign out and continue as a guest. A signed-in account may use local features offline for up to 24 hours after its last successful access check; after that, reconnect or sign out to continue as a guest. Signing out stops usage reporting and returns the app to guest mode.
 
-## Required basic usage reporting
+## Basic usage reporting for signed-in accounts
 
-As a condition of using the free official app, Owlio reports installation and activity counts, app and Windows versions, provider and model categories, language choices, processing durations, audio duration and word counts, and success or failure counts. Events use a random installation identifier. The analytics payload excludes audio, dictated and selected text, spoken commands, API keys, window titles, and your account email. The Privacy Notice explains the separate account and acceptance records. Reporting is required, rather than an optional preference. Temporary delivery failures are retried in the background and do not interrupt dictation.
+Guests send no usage reports. While you are signed in and have accepted these Terms, Owlio reports installation and activity counts, app and Windows versions, provider and model categories, language choices, processing durations, audio duration and word counts, and success or failure counts. Events use a random installation identifier. The analytics payload excludes audio, dictated and selected text, spoken commands, API keys, window titles, and your account email. The Privacy Notice explains the separate account and acceptance records. Reporting is part of using a signed-in account; to stop it, sign out. Temporary delivery failures are retried in the background and do not interrupt dictation.
 
 ## Your content and provider choices
 
@@ -26,8 +26,8 @@ Do not use Owlio to break applicable law, violate others’ rights, distribute m
 
 ## Changes and future paid features
 
-There are no charges under these Terms. Future paid features or subscriptions would require separately disclosed pricing and your explicit purchase approval. Acceptance here is not authorization to charge you later. Material changes to these Terms or the Privacy Notice require acceptance of the new versions before continued use of the updated official app.
+There are no charges under these Terms. Future paid features or subscriptions would require separately disclosed pricing and your explicit purchase approval. Acceptance here is not authorization to charge you later. Material changes to these Terms or the Privacy Notice require signed-in accounts to accept the new versions before continuing with that account; guest mode is not affected.
 
 ## Availability, software licence and contact
 
-Service availability and results are not guaranteed. Keep backups of important local data. Applicable mandatory consumer and privacy rights are not waived. Any open-source software licence, including MIT where supplied, governs your rights to that source code; these Terms cover use of the official app’s account and hosted services. Contact the Owlio project maintainers at shubzveo@gmail.com about access, these Terms, or privacy requests.
+Service availability and results are not guaranteed. Keep backups of important local data. Applicable mandatory consumer and privacy rights are not waived. Any open-source software licence, including MIT where supplied, governs your rights to that source code; these Terms cover use of the official app and its optional account and hosted services. Contact the Owlio project maintainers at shubzveo@gmail.com about access, these Terms, or privacy requests.
