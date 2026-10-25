@@ -2,17 +2,43 @@
   <img src="assets/brand/readme-banner.png" alt="Owlio — Voice typing companion for Windows" width="100%">
 </p>
 
+<h3 align="center">Free, offline voice typing for any Windows app. No account, no subscription.</h3>
+
+<!-- Demo GIF goes here (20 seconds: press shortcut, speak, text lands in VS Code or Slack):
+<p align="center"><img src="docs/assets/demo.gif" alt="OwliO demo" width="720"></p>
+-->
+
 <p align="center">
-  <strong>Speak naturally. Watch your words appear anywhere on Windows.</strong><br>
-  A fast, privacy-first desktop voice typing companion powered by local speech models.<br>
-  Dictate effortlessly across 100+ global languages, regional dialects, and bilingual speech in any app.
+  <a href="https://github.com/theshubzworld/OwliO/releases/latest"><strong>⬇ Download for Windows 10 / 11</strong></a><br>
+  <sub>The installer is unsigned for now, so Windows SmartScreen may warn you: click <em>More info</em> → <em>Run anyway</em>. <a href="#-download">Verify the SHA-256</a>.</sub>
 </p>
+
+---
+
+## ✨ Overview
+
+**Owlio** is an open-source voice typing companion for Windows 10 and 11. Press a global shortcut, speak naturally, and Owlio types your words into whichever text field has focus: VS Code, Outlook, Slack, Notion, a terminal, anything.
+
+It runs **local speech models (Whisper, Bodhan Flex and Parakeet TDT)** on your PC's CPU or NVIDIA GPU, so dictation works offline after setup. It covers 100+ languages, 27 Indian languages, and Hinglish with Devanagari or romanized output. Speed depends on the model, recording length and hardware.
+
+**Use it as a guest.** Owlio needs no account. In guest mode every local feature works and no usage data is sent. Signing in is optional.
+
+### OwliO vs Wispr Flow
+
+| | OwliO | Wispr Flow |
+| --- | --- | --- |
+| Price | Free | Paid subscription, limited free plan |
+| Works offline | Yes, with local models | No, cloud processing |
+| Your audio leaves your PC | Not in local mode | Yes |
+| Account required | No (guest mode) | Yes |
+| Open source | Yes, MIT app code | No |
+| Platforms | Windows | Mac, Windows, iOS, Android |
+
+<sub>Wispr Flow details reflect its public pages as of October 2026 and may change.</sub>
 
 <p align="center">
   <a href="https://github.com/theshubzworld/OwliO/releases/latest"><img src="https://img.shields.io/github/v/release/theshubzworld/OwliO?style=flat-square&color=682d49&label=Windows%20Release" alt="Latest Release"></a>
   <a href="https://theshubzworld.github.io/OwliO/"><img src="https://img.shields.io/badge/Website-Live%20Demo-f59e6c?style=flat-square" alt="Website"></a>
-  <a href="#-supported-languages"><img src="https://img.shields.io/badge/Languages-100%2B%20Global-682d49?style=flat-square" alt="100+ Languages"></a>
-  <a href="#-privacy-by-architecture"><img src="https://img.shields.io/badge/Privacy-100%25%20On--Device-15803d?style=flat-square" alt="Privacy First"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License"></a>
   <a href="#-contributing"><img src="https://img.shields.io/badge/PRs-Welcome-brightgreen?style=flat-square" alt="PRs Welcome"></a>
 </p>
@@ -23,24 +49,15 @@
   <a href="#-supported-languages">Languages</a> &nbsp;•&nbsp;
   <a href="#-how-it-works">How it Works</a> &nbsp;•&nbsp;
   <a href="#-privacy-by-architecture">Privacy</a> &nbsp;•&nbsp;
-  <a href="#-contributing">Contributing</a> &nbsp;•&nbsp;
-  <a href="https://theshubzworld.github.io/OwliO/">Official Site</a>
+  <a href="#-contributing">Contributing</a>
 </p>
-
----
-
-## ✨ Overview
-
-**Owlio** is an open-source voice typing companion for Windows 10 and 11. Press a global shortcut, speak naturally into your microphone, and Owlio transcribes your thoughts directly into whichever text field currently has focus—whether you're writing code in VS Code, drafting an email in Outlook, chatting on Slack, or taking notes in Notion.
-
-Owlio runs **local speech recognition models (Whisper, Bodhan Flex and Parakeet TDT)** directly on your PC’s CPU or NVIDIA GPU. Local dictation works offline after setup; speed depends on the model, recording length and hardware.
 
 ---
 
 ## ⚡ Key Features
 
 - 🌐 **Works in Every Windows App**: Dictate anywhere you can type. Slack, Word, Notion, IDEs, Discord, Chrome, WhatsApp Desktop, terminal windows, and custom apps.
-- 🔒 **100% On-Device AI Option**: Speech recognition runs entirely on your local hardware using OpenAI Whisper. Offline dictation after downloading your model; your voice recordings never leave your PC.
+- 🔒 **On-Device Speech**: With a local model, speech recognition runs entirely on your hardware. Dictation works offline after the model download, and your recordings stay on your PC.
 - 🚀 **Hardware Acceleration**: Choose lightweight CPU mode or lightning-fast NVIDIA GPU acceleration (CUDA 12.8 support).
 - 🌍 **Over 100 Languages**: Automatic language detection across global languages (English, Spanish, French, German, Japanese, Mandarin, Arabic, and more), plus 27 regional Indic dialects and bilingual Hinglish.
 - 🦉 **Your Companion, Your Way**: Customise your floating desk companion with multiple styles: Owl, Sleepy Cat, Little Cloud, Friendly Robot, Minimal Waveform, or Glowing Pebble.
@@ -122,14 +139,14 @@ Pre-built Windows 64-bit installers are published on the official [GitHub Releas
 
 ---
 
-## 🛠️ Guided Setup & Zero Prerequisites
+## 🛠️ Guided Setup, No Manual Installs
 
 You **do not need to install Python, PyTorch, or CUDA manually**.
 
 On first launch, Owlio's interactive setup assistant handles everything in an isolated, private application directory:
 1. **Lightweight CPU**: Whisper without PyTorch (~200 MB, minimal resource footprint).
 2. **Full CPU**: Full PyTorch & Hugging Face Transformers models.
-3. **NVIDIA GPU**: CUDA 12.8 GPU-accelerated transcription for sub-second recognition.
+3. **NVIDIA GPU**: CUDA 12.8 GPU-accelerated transcription for the fastest local recognition.
 4. **Cloud Mode**: Connect your own Groq or Gemini API keys if you prefer zero local disk usage.
 
 Speech models download on demand and can be stored on any drive you specify in **Settings → Advanced Storage**.
@@ -141,8 +158,8 @@ Speech models download on demand and can be stored on any drive you specify in *
 - **Audio Stays on Your Machine**: When using local Whisper models, all audio processing occurs exclusively on your CPU or GPU. No voice recordings are ever sent to remote servers.
 - **Local Profile Storage**: Dictation history, personal dictionary entries, drafts, and custom snippets live inside your private Windows user profile (`%APPDATA%/Owlio`).
 - **Optional Cloud AI**: Cloud speech recognition (Groq) or AI writing polish (Gemini / Ollama) is strictly opt-in and uses your own API keys.
-- **Guest Mode by Default**: No account, no sign-in and no usage reporting are needed to use every local feature.
-- **Optional Account**: If you choose to sign in, basic usage counts (activity, model and language categories, processing times, audio duration, word counts, app and Windows versions) are reported for that account. Audio, transcribed text, API keys, and email addresses are never included. Signing out returns you to guest mode. Read our full [Privacy Notice](https://theshubzworld.github.io/OwliO/legal/privacy-notice.html) and [account details](docs/accounts-analytics.md).
+- **No Account Needed**: Owlio runs in guest mode by default. Guests get every local feature and send no usage data at all.
+- **Reporting Only If You Sign In**: Signing in is optional. Signed-in accounts accept the Terms of Use and send basic usage counts (activity, model and language categories, timings, success or failure). Audio, dictated text, API keys, window titles and your email are never included in usage events. Sign out at any time to return to guest mode. Read the full [Privacy Notice](https://theshubzworld.github.io/OwliO/legal/privacy-notice.html).
 
 ---
 

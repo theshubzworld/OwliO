@@ -6,7 +6,7 @@ import { SecureSessionStorage } from './secureSessionStorage';
 import { AccountService } from './accountService';
 import { AnalyticsService } from './analyticsService';
 import type { MetricEventName } from '../shared/telemetry';
-import { accountAccessError } from '../shared/accountAccess';
+import { accountAccessError, isGuest, reportingAllowed } from '../shared/accountAccess';
 let analytics: AnalyticsService | undefined,
   account: AccountService | undefined;
 export function captureMetric(
@@ -14,7 +14,7 @@ export function captureMetric(
   properties: Record<string, unknown> = {}
 ) {
   try {
-    if (accountAccessError(account?.status())) return;
+    if (!reportingAllowed(account?.status())) return;
     analytics?.capture(event, properties);
   } catch {
     /* Metrics never block the product. */
@@ -22,10 +22,15 @@ export function captureMetric(
 }
 export function requireAccountAccess() {
   const status = account?.status();
+  // Guests use every local feature with no account and no reporting.
+  if (isGuest(status)) return;
   const error = accountAccessError(status);
   if (error) throw Error(error);
-  // Guests have no account and no reporting; only signed-in accounts report usage.
-  if (status?.user && !analytics?.status().enabled) throw Error('Basic usage reporting for your signed-in account could not start. Restart Owlio, or sign out to continue as a guest.');
+  if (!analytics?.status().enabled) throw Error('Account usage reporting could not start. Restart Owlio, or sign out to continue as a guest.');
+}
+function requireSignedInAccess() {
+  if (isGuest(account?.status())) throw Error('Sign in with an administrator account to open the owner dashboard.');
+  requireAccountAccess();
 }
 export function startCloudServices(onAccessLost?: () => void) {
   if (!app?.isReady?.()) return;
@@ -57,16 +62,14 @@ export function startCloudServices(onAccessLost?: () => void) {
   let clearedSignedOutReporting = false;
   const syncAccess = () => {
     const status = account!.status();
-    // Local features are allowed for guests and verified accounts; usage
-    // reporting is allowed only for a signed-in account that passed every check.
     let allowed = !accountAccessError(status);
-    let reporting = allowed && !!status.user;
+    const reporting = reportingAllowed(status);
     try {
       analytics!.setAccessAllowed(reporting);
       if (reporting && !analytics!.status().enabled) analytics!.setEnabled(true);
       else if (!status.user && !clearedSignedOutReporting) analytics!.setEnabled(false);
       clearedSignedOutReporting = !status.user;
-    } catch { allowed = false; reporting = false; analytics!.setAccessAllowed(false); }
+    } catch { if (status.user) allowed = false; analytics!.setAccessAllowed(false); }
     if (!allowed && wasAllowed) {
       onAccessLost?.();
       for (const window of BrowserWindow.getAllWindows()) window.webContents.send('account-changed', status);
@@ -117,13 +120,13 @@ export function startCloudServices(onAccessLost?: () => void) {
   handle('account-accept-terms', (confirmed) => account!.acceptTerms(confirmed, app.getVersion()));
   handle('account-refresh-access', async () => { await account!.refreshAccess(); return account!.status(); });
   handle('analytics-status', () => analytics!.status());
-  handle('analytics-consent', () => { throw Error('Basic usage reporting applies only while you are signed in. Sign out to stop reporting and continue as a guest.'); });
-  handle('admin-metrics', (days) => { requireAccountAccess(); return account!.adminMetrics(days); });
+  handle('analytics-consent', () => { throw Error('Usage reporting is tied to your account. Sign out to continue as a guest with no reporting.'); });
+  handle('admin-metrics', (days) => { requireSignedInAccess(); return account!.adminMetrics(days); });
   handle('admin-accounts', (search, page) =>
-    { requireAccountAccess(); return account!.adminAccounts(search, page); }
+    { requireSignedInAccess(); return account!.adminAccounts(search, page); }
   );
   handle('admin-set-access', (userId, blocked, reason) =>
-    { requireAccountAccess(); return account!.adminSetAccess(userId, blocked, reason); }
+    { requireSignedInAccess(); return account!.adminSetAccess(userId, blocked, reason); }
   );
 }
 const accessTimers: ReturnType<typeof setInterval>[] = [];

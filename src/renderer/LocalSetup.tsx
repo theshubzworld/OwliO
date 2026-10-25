@@ -192,6 +192,6 @@ export function FirstRunSetup({onChange,onDone,onAccount}:{onChange:(patch:Parti
     <button type="button" className="btn btn-secondary setup-later" disabled={saving} onClick={()=>{void complete(true);}}><Settings2 size={16}/>Set up later</button>
     <p className="muted">You can return to setup under Speech &amp; models.</p>
     <UsageConsent compact/>
-    <p className="muted">Sign-in and accepted terms are required. {onAccount && <button className="setup-account-link" type="button" onClick={onAccount}>Account &amp; privacy settings →</button>}</p>
+    <p className="muted">No account needed. Signing in is optional. {onAccount && <button className="setup-account-link" type="button" onClick={onAccount}>Account &amp; privacy settings →</button>}</p>
   </section>;
 }
