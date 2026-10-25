@@ -38,3 +38,19 @@ cookies*.txt
 scratch/
 
 *.key
+
+# Local verification and production tooling are not published.
+/tests/
+/test-helper.js
+/tsconfig.test.json
+/release-artifacts/
+/scripts/benchmark_formatting.cjs
+/scripts/create_icon.py
+/scripts/create_owlio_assets.py
+/scripts/render_owlio_brand.cjs
+/scripts/render_readme.cjs
+/assets/brand/generation-prompts.json
+/assets/brand/owlio-brand-preview.png
+/docs/model-evaluations/gemini-romanization.md
+/docs/model-evaluations/hindi-to-hinglish-pro.md
+/docs/speech-pipeline-audit.md

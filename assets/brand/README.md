@@ -7,11 +7,8 @@
 - `owlio.ico`: Windows app/taskbar icon, containing 16, 20, 24, 32, 40, 48, 64, 128 and 256 pixel images.
 - `owlio-icon.png`: 256 pixel PNG used by the desktop tray and dashboard.
 - `owlio-icon-{size}.png`: individual exports, up to 512 pixels.
-- `owlio-brand-preview.png`: preview of the logo, mascot and small icons on light and dark surfaces.
-- `readme-banner.png`: cream and plum repository header, using the existing Owlio wordmark. Regenerate with `electron scripts/render_readme.cjs`.
+- `readme-banner.png`: cream and plum repository header, using the existing Owlio wordmark.
 
-Artwork generated with the built-in `image_gen` tool. The exact prompts are saved in `generation-prompts.json`.
-`scripts/create_owlio_assets.py` exports the supplied mark to PNG/ICO and writes the logo SVG.
-`scripts/render_owlio_brand.cjs` exports the PNG wordmark and preview using Electron.
+Artwork generated with the built-in `image_gen` tool. Artwork-generation tools and previews are maintained locally and are not required to build the app.
 
 Original Owlio icon files remain in `assets/`.

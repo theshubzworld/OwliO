@@ -141,7 +141,6 @@ Sign-in and terms checks run at startup/sign-in and approximately every 60 secon
 ```powershell
 npm ci
 npm run typecheck
-npm test
 npm run build:renderer
 npm run build:main
 npm start
@@ -159,17 +158,7 @@ Local tests cover the real Postgres migration functions using PGlite with Supaba
 6. Before acceptance and after sign-out, no usage HTTP requests occur. After acceptance, reporting is required; an attempt to toggle the old consent IPC is rejected. Inspect event properties to confirm there is no text/audio/email/key.
 7. Disconnect: only the valid 24-hour access cache permits local features. Queue events within bounds (200 / seven days). Sign out: pending sends abort and the queue clears. Test missing/expired cache, a different account, and updated policy versions; none may unlock the app.
 
-For a manual live email/admin check using a disposable encrypted Windows profile:
-
-```powershell
-npm run build:renderer
-npm run build:main
-.\node_modules\.bin\electron.cmd tests/account-live.cjs YOUR_ADMIN_EMAIL
-```
-
-This sends one sign-in email. Open the newest link on the same computer, or enter its code in the Owlio window if you configured a code template. It exercises real renderer/preload/main authentication, authorized admin RPCs, Windows-encrypted storage, session restoration and sign-out. It requires the tester to review and accept the displayed terms explicitly, verifies required reporting, stops reporting on sign-out, and writes only a result summary and local screenshot under ignored `tests/.runtime/`. `--check-only` checks the configured screen without sending email. These checks do not configure Google or SMTP for you.
-
-Add `--google` to run the same session/admin checks using Google browser sign-in without sending an email. Choose the specified administrator email in the browser. The test uses a disposable profile and signs out when complete.
+Internal automated email/admin verification tools and their temporary profiles are maintained locally and are not part of the public source. Use the checklist above to verify your deployment.
 
 ### Interpreting database advisor results
 

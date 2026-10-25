@@ -126,68 +126,7 @@ Dictation history and audio playback, microphone selection/testing, meeting reco
 
 ## Verification
 
-```powershell
-npm test
-python tests/server_response_test.py
-python tests/model_manager_test.py
-python tests/huggingface_models_test.py
-python tests/flex_backend_test.py
-python tests/transformers_whisper_test.py
-pwsh -NoProfile -STA -File tests/native-paste.ps1
-pwsh -NoProfile -STA -File tests/native-shortcuts.ps1 -HelperPath windows-helper/bin/Release/net8.0-windows/publish/windows-helper.exe
-.\node_modules\.bin\electron.cmd tests/pill-smoke.cjs
-.\node_modules\.bin\electron.cmd tests/overlay-smoke.cjs
-.\node_modules\.bin\electron.cmd tests/app-startup.cjs
-.\node_modules\.bin\electron.cmd tests/bar-designs-smoke.cjs
-.\node_modules\.bin\electron.cmd tests/appearance-focus-smoke.cjs
-.\node_modules\.bin\electron.cmd tests/release-smoke.cjs
-.\node_modules\.bin\electron.cmd tests/release-smoke.cjs --fresh
-.\node_modules\.bin\electron.cmd tests/first-run-smoke.cjs
-# Optional real download/install check; uses an isolated test profile and a generated WAV.
-node tests/local-setup-live.cjs
-# After that test: real model copying, custom folders, cache cleanup and restart.
-node tests/storage-live.cjs
-```
-
-The native tests use temporary text fields and restore the previous foreground window and clipboard. The shortcut test enables injected input only in its isolated helper. Normal dictation ignores injected keys.
-
-After packaging, `release-smoke.cjs` boots the shipped ASAR and Windows helper in an isolated packaged-profile harness. It verifies the version, included setup resources, taskbar icons, seven bar designs and saved choices. The `--fresh` check exercises first-run display, skipping and reopening guided setup. It seeds synthetic settings and does not read or migrate the installed profile. It checks shipped application resources without running the installer.
-
-Setup validation includes fixed input/package handling, archive checksum failure, isolated package indexes, cancellation/retry and preserving a working runtime. Real Windows tests downloaded portable Python, installed lightweight CPU libraries, downloaded Whisper tiny, started the server and transcribed a generated phrase. A separate real full CPU package install verified PyTorch, Transformers and the reviewed Flex loader. The NVIDIA package's command selection and CUDA checks are covered; its large package download was not repeated in the fresh-runtime test.
-
-Storage checks cover saved custom/separate paths, overlapping folder rejection, junction safety, source retention, conflicting model files, interrupted copies, scoped cache cleanup and busy-job guards. The live storage test copies the isolated Whisper cache, installs an independent CPU runtime into a path with spaces, transcribes synthetic speech, clears downloads and restarts the server successfully from the custom folders.
-
-With the local server running, a generated speech WAV can verify recognition, parsing, formatting fallback and actual Windows insertion:
-
-```powershell
-node tests/live-dictation.cjs path/to/speech.wav
-```
-
-Build an installer with npm run package. The package includes the app icon, speech-server/setup source and self-contained Windows helper; guided setup or Speech & models downloads Python and speech dependencies when requested.
-
-### Development: Settings navigation
-
-The dictation dashboard fills the available content width with 36 px outer padding and a 300 px summary column (280 px on smaller desktops). Transcript text and correction forms are limited to 90ch inside the wider history cards. History scrolls in its own region; the header and summary stay fixed. A short window allows the summary to scroll independently so every setup link remains reachable. Activity groups total words, average WPM and the current streak; Current setup groups recognition, microphone and output with links to their settings. At window widths of 1,100 px or less, the summary becomes compact cards above history, with expandable setup details. The renderer smoke check covers 800–2,560 px, page-width usage, independent history scrolling, text wrapping, column alignment and all three settings links.
-
-Configure has Speech & models, Text & style, and General settings. A global Save settings applies all pending preferences across these pages, including speech/Ollama model selections and appearance. Downloads, storage/repair operations and explicit dictionary/rule record actions execute when requested. Main speech setup chooses dependencies from the model; package/hardware overrides, component diagnostics, custom imports, advanced punctuation and custom rules stay behind Advanced disclosures.
-
-Windows startup is opt-in under General settings → Startup. `windowsStartup.ts` uses Electron login-item APIs with the packaged Owlio executable, fixed `com.owlio.desktop` entry and `--startup` argument. Reads reflect Windows Startup approval rather than reapplying a stale saved flag. Save verifies the OS change before committing preferences and restores the previous OS state if the commit fails. Development Electron executables cannot register themselves. A second startup launch does not bring an existing dashboard forward. Full uninstall removes the entry; upgrades preserve it. Tests mock registration/approval and exercise the staged settings UI; they do not enable startup in the developer's Windows account or perform a real sign-out/restart.
-
-The Gemini lists helper uses the current Writing AI selection. Writing rules expose all-app/specific-app choices while persisting the same process-name schema. General settings → Privacy documents provider-specific data flows. Gemini dictation cleanup receives a coarse app category rather than surrounding field contents.
-
-Each Save button submits only its section's fields and preserves pending edits in other sections. Unsaved dots appear in the sidebar and text views. Downloads/model activation, appearance and writing rules save immediately. Legacy `tab=style` links still open Writing style, and `tab=settings` opens General settings. `tab=models` and `tab=text` open the new pages. The isolated Electron check `tests/settings-navigation.cjs` verifies navigation, draft preservation, per-section persistence, encrypted credentials, local/cloud model controls and narrow-window layout without contacting model APIs.
-
-Gemini Roman Hinglish is off by default and uses the existing Vertex key. After speech recognition it converts only transcripts containing Hindi letters, validates the result, then runs the selected cleanup. English-only text skips this request. Rejected conversion returns the exact original transcript before cleanup or dictionary processing, with a history warning. Original recognition stays in `rawText`; voice rewrites and meeting transcripts retain their existing path. This feature adds no Firebase dependency.
-
-### Development: floating bar appearance
-
-General settings → Appearance offers Owlio owl, Sleepy cat, Little cloud, Friendly robot, Mini waveform, Glowing pebble and Firefly. Hovering or focusing a choice previews listening; choosing it saves only `barDesign`. Older profiles default to `owl`, and unsupported stored design names are rejected by validation. The existing owl SVG and recorder remain unchanged.
-
-Each new design occupies the existing 32px avatar inside the original idle/active hit areas. The microphone, meeting, settings and error-recovery controls are shared. All designs show starting, listening, processing, inserted and error feedback; robot, waveform and pebble visuals use the existing microphone level. Animations respect reduced motion. Changing the design updates presentation without restarting capture or changing the shortcut, microphone, model or writing preferences. Reloaded bars restore the saved design.
-
-The isolated bar-design smoke test verifies all seven designs with 49 state/hover captures, synthetic audio capture and release, switching during recording, unchanged unrelated settings, saved choices, reload recovery, control actions, layout alignment and reduced motion. It does not access the installed profile or send audio to an API. The installed app remains unchanged.
-
-The appearance-focus test uses real Electron mouse and arrow-key events at three window sizes. It checks that choosing a visible card preserves the settings scroll, keyboard focus and viewport-aligned dashboard/sidebar. Hidden radio inputs are positioned inside their cards, the dashboard frame is fixed to the viewport, and saving retains the focused input while the existing saving guard prevents overlapping choices.
+Run `npm run typecheck` and `npm run build` before packaging. Internal test suites, smoke checks, recordings and benchmark reports are maintained locally and excluded from the public repository.
 
 ## Multilingual speech and automatic model selection (1.0.12)
 
@@ -201,4 +140,4 @@ Local and cloud transcription omit the language field for automatic detection. T
 
 Validation covers persistence, model compatibility, transport parameters, backend routing, script-preserving cleanup and the multilingual UI. It does not constitute live recognition testing across all languages.
 
-The [speech pipeline audit resolution](speech-pipeline-audit.md) documents removed providers, checkpoint-specific Hinglish decoding, Unicode replacements and regression coverage.
+Internal speech pipeline audit reports and verification fixtures are maintained locally and excluded from the published source.

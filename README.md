@@ -178,10 +178,10 @@ Packaged outputs will be created in `release-artifacts/<version>/`. See the [Dev
    git checkout -b feature/my-amazing-feature
    ```
 2. Make your improvements with clean, readable code.
-3. Run tests and type verification:
+3. Run type verification and build:
    ```bash
    npm run typecheck
-   npm test
+   npm run build
    ```
 4. Commit your changes with clear, descriptive commit messages.
 5. Push to your fork and submit a Pull Request! We review PRs actively and appreciate every contribution.
