@@ -1,6 +1,6 @@
 # Required sign-in, terms acceptance and basic usage reporting
 
-The official app is currently free, with **required sign-in, explicit acceptance of versioned Terms of Use and the Privacy Notice, and required basic usage reporting**. There is no guest bypass, billing or payment collection. Signing in alone does not accept the terms or enable reporting. Signing out locks access and stops collection. Existing installed 1.0.15 binaries retain their earlier optional-account behavior; this source update cannot retroactively change those binaries.
+The official app is free and works in **guest mode**: with no account, every local feature is available and **no usage reporting is collected**. Signing in is optional. If you sign in, you must accept the versioned Terms of Use and the Privacy Notice, and basic usage reporting runs for that account. Signing in alone does not accept the terms or enable reporting. Signing out returns you to guest mode and stops collection. There is no billing or payment collection. Existing installed 1.0.15 binaries retain their earlier optional-account behavior; this source update cannot retroactively change those binaries.
 
 **Release 1.0.16:** [Terms of Use](legal/terms-of-use.md) and [Privacy Notice](legal/privacy-notice.md), version `2026-10-23`, govern the free official app. Earlier draft documents are retained for history. The final policy is a separate immutable version and hash. No existing user is auto-accepted. The installer retains checks against draft legal documents and overwriting an existing installer.
 

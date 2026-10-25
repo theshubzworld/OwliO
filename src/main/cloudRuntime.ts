@@ -21,9 +21,11 @@ export function captureMetric(
   }
 }
 export function requireAccountAccess() {
-  const error = accountAccessError(account?.status());
+  const status = account?.status();
+  const error = accountAccessError(status);
   if (error) throw Error(error);
-  if (!analytics?.status().enabled) throw Error('Required basic usage reporting could not start. Restart Owlio and check account access.');
+  // Guests have no account and no reporting; only signed-in accounts report usage.
+  if (status?.user && !analytics?.status().enabled) throw Error('Basic usage reporting for your signed-in account could not start. Restart Owlio, or sign out to continue as a guest.');
 }
 export function startCloudServices(onAccessLost?: () => void) {
   if (!app?.isReady?.()) return;
@@ -55,13 +57,16 @@ export function startCloudServices(onAccessLost?: () => void) {
   let clearedSignedOutReporting = false;
   const syncAccess = () => {
     const status = account!.status();
+    // Local features are allowed for guests and verified accounts; usage
+    // reporting is allowed only for a signed-in account that passed every check.
     let allowed = !accountAccessError(status);
+    let reporting = allowed && !!status.user;
     try {
-      analytics!.setAccessAllowed(allowed);
-      if (allowed && !analytics!.status().enabled) analytics!.setEnabled(true);
+      analytics!.setAccessAllowed(reporting);
+      if (reporting && !analytics!.status().enabled) analytics!.setEnabled(true);
       else if (!status.user && !clearedSignedOutReporting) analytics!.setEnabled(false);
       clearedSignedOutReporting = !status.user;
-    } catch { allowed = false; analytics!.setAccessAllowed(false); }
+    } catch { allowed = false; reporting = false; analytics!.setAccessAllowed(false); }
     if (!allowed && wasAllowed) {
       onAccessLost?.();
       for (const window of BrowserWindow.getAllWindows()) window.webContents.send('account-changed', status);
@@ -112,7 +117,7 @@ export function startCloudServices(onAccessLost?: () => void) {
   handle('account-accept-terms', (confirmed) => account!.acceptTerms(confirmed, app.getVersion()));
   handle('account-refresh-access', async () => { await account!.refreshAccess(); return account!.status(); });
   handle('analytics-status', () => analytics!.status());
-  handle('analytics-consent', () => { throw Error('Basic usage reporting is required under the Terms of Use. Sign out to stop using the app and stop reporting.'); });
+  handle('analytics-consent', () => { throw Error('Basic usage reporting applies only while you are signed in. Sign out to stop reporting and continue as a guest.'); });
   handle('admin-metrics', (days) => { requireAccountAccess(); return account!.adminMetrics(days); });
   handle('admin-accounts', (search, page) =>
     { requireAccountAccess(); return account!.adminAccounts(search, page); }
