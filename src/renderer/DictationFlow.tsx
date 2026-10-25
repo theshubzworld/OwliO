@@ -2,10 +2,11 @@ import React from 'react';
 import { usesHindiConversion } from '../shared/speechLanguages';
 import { writingProvider } from '../shared/writingConfig';
 import type { AppSettings } from '../main/store';
+import { speechModelLabel } from '../shared/speechModels';
 
 export function DictationFlow({settings}: {settings: AppSettings}) {
   const local = settings.provider === 'local';
-  const speech = local ? (settings.localSttModel === 'bodhan-flex' ? 'Bodhan Flex' : settings.localSttModel.replace(/^hf:/, '').split('/').pop() || 'Local model')
+  const speech = local ? (speechModelLabel(settings.localSttModel).split('/').pop() || 'Local model')
     : 'Groq';
   const script = settings.romanizationProvider === 'gemini'&&usesHindiConversion(settings.dictationLanguage) ? 'Roman Hinglish'
     : 'Original script';

@@ -380,7 +380,7 @@
       <a class="brand" href="#home" aria-label="Owlio home">
         <img src="assets/owlio-icon-128.png" alt="">
         <span>Owlio</span>
-        <span class="brand-tag" id="version-tag">v1.0.19</span>
+        <span class="brand-tag" id="version-tag">v1.0.21</span>
       </a>
       <nav class="nav" aria-label="Main navigation">
         <a href="#features">Features</a>
@@ -642,7 +642,7 @@
           <h2>Get Owlio for Windows</h2>
           <p>The installer includes the desktop app, setup assistant, and companion overlay. Speech models download on demand.</p>
           <div class="meta-tags">
-            <span class="meta-tag" id="version-meta">Version 1.0.19</span>
+            <span class="meta-tag" id="version-meta">Version 1.0.21</span>
             <span class="meta-tag">Windows 10 / 11 (x64)</span>
             <span class="meta-tag">SHA-256 published</span>
             <span class="meta-tag">MIT-licensed source</span>
@@ -791,6 +791,9 @@
           var v = d.tag_name.charAt(0).toLowerCase() === 'v' ? d.tag_name : 'v' + d.tag_name;
           var tag = document.getElementById('version-tag');
           var meta = document.getElementById('version-meta');
+          // An older published release must not replace this page's newer version.
+          var current = tag ? tag.textContent.replace(/^v/i, '') : '';
+          if (!/^v\d+\.\d+\.\d+$/i.test(v) || v.replace(/^v/i, '').localeCompare(current, undefined, { numeric: true }) < 0) return;
           if (tag) tag.textContent = v;
           if (meta) meta.textContent = 'Version ' + v.replace(/^v/i, '');
         }).catch(function () {});

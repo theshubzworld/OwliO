@@ -16,6 +16,8 @@ def main():
     features = {'core': True, 'full': False, 'cuda': False, 'python': sys.version.split()[0]}
     if preset != 'whisper-cpu':
         import torch, torchaudio, transformers, accelerate, safetensors, sentencepiece, soundfile
+        import librosa, soxr
+        from transformers import ParakeetForTDT, AutoProcessor
         from vendor.bodhan_flex.indic_transcribe import IndicTranscribe
         features.update(full=True, cuda=torch.cuda.is_available())
         if preset == 'full-cuda' and not features['cuda']:
@@ -26,10 +28,10 @@ def main():
     if command not in ('model', 'verify-model'):
         raise ValueError('Unsupported setup command.')
     model = request.get('model')
-    if command == 'model' and model not in ('tiny', 'base', 'small', 'turbo', 'bodhan-flex'):
+    if command == 'model' and model not in ('tiny', 'base', 'small', 'turbo', 'bodhan-flex', 'bark-pro') and not (isinstance(model, str) and model.startswith('hf:')):
         raise ValueError('Choose a supported setup model.')
-    if model == 'bodhan-flex' and not features['full']:
-        raise ValueError('Bodhan Flex needs a Full speech package.')
+    if (model in ('bodhan-flex', 'bark-pro') or str(model).startswith('hf:')) and not features['full']:
+        raise ValueError('This model needs a Full speech package.')
     cache = Path(request['models']).resolve()
     if not cache.is_dir():
         raise ValueError('The model folder is missing.')
@@ -41,13 +43,12 @@ def main():
     from model_manager import ModelManager
     manager = ModelManager(model, cache_dir=str(cache), device='cuda' if preset == 'full-cuda' else 'cpu')
     model = manager.normalize(model)  # Rechecks also accept the existing catalogue and registered custom models.
+    language = request.get('language')
+    supported = manager.supported_languages(model)
+    if language not in (None, 'auto') and supported and ('hi' if language == 'hinglish' else language) not in supported:
+        raise ValueError('The selected model does not document support for this language.')
     if command == 'model' and not manager.cached_path(model):
-        if model == 'bodhan-flex':
-            from flex_backend import download_flex
-            download_flex(str(cache))
-        else:
-            from faster_whisper.utils import download_model
-            download_model(model, cache_dir=str(cache))
+        manager.download(model)
     if not manager.cached_path(model):
         raise ValueError('The selected model download is incomplete.')
     # Validate loading before installing the new runtime configuration. No audio is recorded.

@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { modelLanguageSummary,modelHasDocumentedLanguage,documentedModelLanguages,languageName } from '../shared/speechLanguages';
 import { recommendedPreset, type LocalSetupStatus } from '../shared/localSetup';
 import { Download, Cpu, RefreshCw, Check, Loader2, Trash2 } from 'lucide-react';
+import {SetupProgress} from './SetupProgress';
 
-type SpeechModel = { id: string; name: string; downloaded: boolean; bytes?: number; engine?: string; languages?:string[]|null };
+type SpeechModel = { id: string; name: string; downloaded: boolean; bytes?: number; engine?: string; languages?:string[]|null; runtime_ready?:boolean; runtime_error?:string };
 type Job = { id: string; model: string; status: string; action?: string; error?: string; state?: string; completed?: number; total?: number };
 type Catalogue = {
   speech: { online: boolean; error?: string; loaded_model?: string; cache_directory?: string; runtime?: { device?: string; compute_type?: string }; models?: SpeechModel[]; jobs?: Job[] };
@@ -15,6 +16,7 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
   const [formatting, setFormatting] = useState(settings.localLlmModel || 'llama3.2');
   const [setup,setSetup]=useState<LocalSetupStatus|null>(null);
   const [pendingSelection,setPendingSelection]=useState('');
+  const [pendingSetupRevision,setPendingSetupRevision]=useState<number|null>(null);
   const [accessToken,setAccessToken]=useState('');
   const picker=useRef<HTMLDetailsElement|null>(null);
   const [busy, setBusy] = useState('');
@@ -26,10 +28,12 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
   const refresh = async (manual = false) => {
     if (manual) { setRefreshing(true); setError(''); setMessage(''); }
     try {
-      const data: Catalogue = await (window as any).api.getLocalModels();
-      const nextSetup=section==='formatting'?null:await (window as any).api.getLocalSetup();
+      const [data,nextSetup]:[Catalogue,LocalSetupStatus|null]=await Promise.all([
+        (window as any).api.getLocalModels(),
+        section==='formatting'?Promise.resolve(null):(window as any).api.getLocalSetup(),
+      ]);
       if (mounted.current) {
-        setCatalogue(data);if(nextSetup)setSetup(nextSetup);
+        setCatalogue(data);if(nextSetup)setSetup(previous=>(previous?.revision??0)>(nextSetup.revision??0)?previous:nextSetup);
         if (manual && section !== 'speech') {
           if (!data.formatting.online) setError('Cannot refresh models. Start Ollama at the saved address, then try again.');
           else {
@@ -54,10 +58,13 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
   const act = async () => {
     setBusy('download');setError('');setMessage('');
     try {
-      if(selected==='bodhan-flex') {
-        await (window as any).api.startLocalSetup({action:'model',language:settings.dictationLanguage,preset:recommendedPreset(selected,setup?.connectedPreset),model:selected,token:accessToken.trim()||undefined});
+      if(selected==='bodhan-flex'||selected==='bark-pro'||needsRuntime) {
+        const next:LocalSetupStatus=await (window as any).api.startLocalSetup({action:'model',language:settings.dictationLanguage,preset:recommendedPreset(selected,setup?.connectedPreset||(catalogue?.speech.runtime?.device==='cuda'?'full-cuda':undefined)),model:selected,token:accessToken.trim()||undefined});
+        if(!mounted.current)return;
+        setSetup(next);setPendingSetupRevision(next.revision??0);
         setMessage('Installing the libraries and model needed for speech. Setup connects it after verification.');
       } else {
+        setPendingSetupRevision(null);
         await (window as any).api.speechModelAction(selected,'download');
         setMessage('Downloading. Save settings once the model is ready.');
       }
@@ -108,11 +115,12 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
   const currentModel = catalogue?.speech.models?.find(model => model.id === settings.localSttModel);
   useEffect(()=>{if(picker.current&&catalogue?.speech.online&&!currentModel?.downloaded)picker.current.open=true;},[settings.localSttModel,catalogue?.speech.online,currentModel?.downloaded]);
   const running = setup?.state==='running'||catalogue?.speech.jobs?.some(job => ['queued', 'inspecting', 'downloading', 'loading'].includes(job.status));
-  const needsRuntime=selected==='bodhan-flex'&&setup?.connectedPreset==='whisper-cpu';
+  const needsRuntime=model?.runtime_ready===false||(['bodhan-flex','bark-pro'].includes(selected)&&setup?.connectedPreset==='whisper-cpu');
   useEffect(()=>{
-    if(pendingSelection&&(setup?.state==='failed'||setup?.state==='cancelled')){setPendingSelection('');return;}
-    if(pendingSelection&&catalogue?.speech.models?.some(item=>item.id===pendingSelection&&item.downloaded)&&setup?.state!=='running'&&(pendingSelection!=='bodhan-flex'||setup?.state==='ready'&&setup.modelInstalled)){onSettingsChange({localSttModel:pendingSelection});setPendingSelection('');}
-  },[catalogue,pendingSelection,setup?.state]);
+    if(pendingSelection&&pendingSetupRevision!==null&&(setup?.state==='failed'||setup?.state==='cancelled')){setPendingSelection('');setPendingSetupRevision(null);return;}
+    const setupReady=pendingSetupRevision===null||!!setup&&setup.state==='ready'&&setup.modelInstalled&&(setup.revision??0)>=pendingSetupRevision;
+    if(pendingSelection&&catalogue?.speech.models?.some(item=>item.id===pendingSelection&&item.downloaded&&item.runtime_ready!==false)&&setup?.state!=='running'&&setupReady){onSettingsChange({localSttModel:pendingSelection});setPendingSelection('');setPendingSetupRevision(null);}
+  },[catalogue,pendingSelection,pendingSetupRevision,setup]);
   const installed = catalogue?.formatting.models?.some(model => model.name === settings.localLlmModel || model.name === settings.localLlmModel + ':latest');
   const installedModels = [...new Set(catalogue?.formatting.models?.map(model => model.name) || [])].sort((a, b) => a.localeCompare(b));
   const installedSelection = installedModels.includes(formatting) ? formatting : installedModels.includes(formatting + ':latest') ? formatting + ':latest' : '';
@@ -128,7 +136,7 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
         <details ref={picker} className="settings-disclosure model-picker">
         <summary>Change speech model<span>Installed models and downloads</span></summary>
         <label className="sr-only" htmlFor="speech-model">Speech model</label>
-        <select id="speech-model" className="select" value={selected} disabled={Boolean(busy) || running} onChange={event => {const id=event.target.value;setSelected(id);setMessage('');setPendingSelection('');if(catalogue?.speech.models?.some(item=>item.id===id&&item.downloaded)&&!(id==='bodhan-flex'&&setup?.connectedPreset==='whisper-cpu'))onSettingsChange({localSttModel:id});}}>
+        <select id="speech-model" className="select" value={selected} disabled={Boolean(busy) || running} onChange={event => {const id=event.target.value;setSelected(id);setMessage('');setPendingSelection('');setPendingSetupRevision(null);if(catalogue?.speech.models?.some(item=>item.id===id&&item.downloaded&&item.runtime_ready!==false)&&!(['bodhan-flex','bark-pro'].includes(id)&&setup?.connectedPreset==='whisper-cpu'))onSettingsChange({localSttModel:id});}}>
           {catalogue.speech.models?.map(model => <option key={model.id} value={model.id}>{model.name} · {model.downloaded ? 'Downloaded' : 'Download needed'}</option>)}
         </select>
         <div className="model-actions"><span className="muted">{model?.downloaded ? `${((model.bytes || 0) / 1024 / 1024).toFixed(0)} MB of model weights on disk` : 'Download before switching. Larger models need more memory and processing time.'}</span>
@@ -141,6 +149,7 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
           )}
         </div>
         <p className="muted">{modelLanguageSummary(selected,model?.languages)}</p>
+        {model?.engine==='parakeet-tdt'&&<p className="muted">Transcribes speech as spoken, including fillers. Writing cleanup and dictionary replacements apply afterward; vocabulary prompts are unavailable for this model.</p>}
         {!!selectedLanguages?.length&&settings.dictationLanguage!=='auto'&&!modelHasDocumentedLanguage({id:selected,languages:selectedLanguages},settings.dictationLanguage)&&<p className="model-warning" role="alert">This model does not document support for {languageName(settings.dictationLanguage)}. Choose a compatible model before saving.</p>}
         {!!selectedLanguages?.length&&settings.dictationLanguage==='auto'&&selectedLanguages.length<99&&<p className="muted">Automatic detection is limited to this model’s listed languages.</p>}
         <p className="muted">{needsRuntime?'Setup adds the libraries this model needs.':'Select Save settings to switch. The model loads on your next dictation.'}</p>
@@ -149,11 +158,12 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
         <details className="settings-disclosure">
         <summary>Advanced models<span>Custom model imports and technical details</span></summary>
         <label htmlFor="huggingface-model-url" className="muted">Custom Hugging Face model URL</label>
-        <div className="model-actions"><input id="huggingface-model-url" className="input" type="text" value={modelUrl} onChange={event => setModelUrl(event.target.value)} placeholder="https://huggingface.co/owner/whisper-model" spellCheck={false} />
+        <div className="model-actions"><input id="huggingface-model-url" className="input" type="text" value={modelUrl} onChange={event => setModelUrl(event.target.value)} placeholder="https://huggingface.co/owner/speech-model" spellCheck={false} />
           <button className="btn btn-secondary" disabled={Boolean(busy) || running || !modelUrl.trim()} onClick={() => void importModel()}>{busy === 'import' ? <Loader2 size={15} className="pill-spinner" /> : <Download size={15} />}Download URL</button></div>
-        <p className="muted"><strong>Setup:</strong> Custom Whisper models need a Full speech package. Install it under Advanced local speech.</p>
+        <p className="muted"><strong>Supported models:</strong> Whisper and Transformers Parakeet TDT checkpoints, including Bark Pro. Other architectures need an additional backend.</p>
+        <p className="muted"><strong>Setup:</strong> Full Whisper and Parakeet models need a Full speech package. Choose Set up model when additional libraries are needed.</p>
         <p className="muted"><strong>Access:</strong> Flex requires Hugging Face approval to download. Downloaded models run offline.</p>
-        <p className="muted"><strong>Languages:</strong> Trelis supports Hindi, English and Hinglish; Flex supports 27 languages. Other custom models need declared language coverage for automatic selection.</p>
+        <p className="muted"><strong>Languages:</strong> Bark Pro supports English; Trelis supports Hindi, English and Hinglish; Flex supports 27 languages. Other custom models need declared language coverage for automatic selection.</p>
         </details>
         <details className="settings-disclosure">
         <summary>Model details<span>Storage location and processing information</span></summary>
@@ -164,8 +174,7 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
         </details>
       </>}
       {speechJobs.filter(job => job.status !== 'ready').map(job => <p key={job.id} className={job.status === 'failed' ? 'model-warning' : 'muted'} role="status">{modelName(job.model)}: {job.error || job.status}</p>)}
-      {setup?.state==='running'&&<div className="setup-progress" role="status"><strong>{setup.message}</strong><progress aria-label="Speech model setup progress" {...(typeof setup.progress==='number'?{value:setup.progress,max:1}:{})}/><button type="button" className="btn btn-secondary" disabled={setup.stage==='connecting'} onClick={()=>void (window as any).api.cancelLocalSetup().then(()=>refresh()).catch((error:Error)=>setError(error.message))}>Cancel setup</button></div>}
-      {setup?.state==='failed'&&<p className="model-warning" role="alert">{setup.error||setup.message}</p>}
+      {setup&&setup.state!=='idle'&&<SetupProgress status={setup} onCancel={()=>void (window as any).api.cancelLocalSetup().then(()=>refresh()).catch((error:Error)=>setError(error.message))}/>}
     </div>}
     {section !== 'speech' && (section === 'formatting' || settings.writingProvider === 'local') && <details open={section === 'formatting' ? true : undefined} className="settings-disclosure optional-formatting">
       <summary>Ollama model<span>Local Writing AI</span></summary>

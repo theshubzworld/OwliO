@@ -47,6 +47,20 @@ class HuggingFaceTests(unittest.TestCase):
         converted = self.inspect({}, ['config.json', 'model.bin', 'tokenizer.json'])
         self.assertEqual(converted['engine'], 'faster-whisper')
 
+    def test_parakeet_requires_processor_and_safetensors_and_excludes_repository_code(self):
+        files = ['config.json', 'model.safetensors', 'processor_config.json', 'tokenizer.json', 'tokenizer_config.json', 'NOTICE', 'run.py', 'model.nemo']
+        entry = self.inspect({'model_type': 'parakeet_tdt'}, files, ['en'])
+        self.assertEqual(entry['engine'], 'parakeet-tdt')
+        self.assertEqual(entry['languages'], ['en'])
+        self.assertIn('processor_config.json', entry['files'])
+        self.assertIn('NOTICE', entry['files'])
+        self.assertNotIn('run.py', entry['files'])
+        self.assertNotIn('model.nemo', entry['files'])
+        with self.assertRaisesRegex(ValueError, 'processor'):
+            self.inspect({'model_type': 'parakeet_tdt'}, ['config.json', 'model.safetensors', 'tokenizer.json'])
+        with self.assertRaisesRegex(ValueError, 'safetensors'):
+            self.inspect({'model_type': 'parakeet_tdt'}, ['config.json', 'pytorch_model.bin', 'tokenizer.json', 'processor_config.json'])
+
     def test_download_failure_is_persisted_as_uninstalled_and_can_resume(self):
         with tempfile.TemporaryDirectory() as directory:
             entry = {'id': 'hf:owner/model', 'name': 'owner/model', 'repository': 'owner/model', 'revision': 'sha', 'engine': 'transformers', 'bytes': 10, 'files': ['config.json', 'model.safetensors']}

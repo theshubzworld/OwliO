@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'crypto';
 import { spawn, type ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import { supportsSpeechLanguage,languageName } from '../shared/speechLanguages';
+import { speechModelId } from '../shared/speechModels';
 import { RUNTIME_PRESETS, SETUP_MODELS, type SetupRequest, type LocalSetupStatus, type RuntimePreset, type StoragePaths } from '../shared/localSetup';
 import { loadStorage, saveStorage, storagePaths, within, availableBytes, markCache, clearDownloadCache, copyModelCache, validateStorage, physicalPath } from './localStorage';
 
@@ -21,14 +22,23 @@ type Dependencies = { download?: (target: string, signal: AbortSignal, progress:
 
 export function setupRequest(value: unknown): SetupRequest {
   const v = value as Partial<SetupRequest> | null;
-  if (!v || !['python','libraries','model','all','check'].includes(v.action || '') || !RUNTIME_PRESETS.some(p => p.id === v.preset) || !SETUP_MODELS.some(m => m.id === v.model)) throw Error('Choose a supported setup action, speech package and model.');
-  if (v.preset === 'whisper-cpu' && v.model === 'bodhan-flex') throw Error('Bodhan Flex needs a Full speech package.');
+  if (!v || !['python','libraries','model','all','check'].includes(v.action || '') || !RUNTIME_PRESETS.some(p => p.id === v.preset) || !(SETUP_MODELS.some(m => m.id === v.model) || typeof v.model==='string'&&v.model.startsWith('hf:')&&speechModelId(v.model))) throw Error('Choose a supported setup action, speech package and model.');
+  if (v.preset === 'whisper-cpu' && (SETUP_MODELS.find(m=>m.id===v.model)?.full||v.model?.startsWith('hf:'))) throw Error('This model needs a Full speech package.');
   if (v.token !== undefined && (typeof v.token !== 'string' || v.token.length > 512 || (v.token.trim() && !/^hf_[A-Za-z0-9]+$/.test(v.token.trim())))) throw Error('Enter a Hugging Face read token beginning with hf_.');
   if(v.language!==undefined&&(typeof v.language!=='string'||!supportsSpeechLanguage('local',v.model!,v.language)))throw Error('Choose a language supported by the setup model.');
   return { language:v.language, action: v.action!, preset: v.preset!, model: v.model!, token: v.token?.trim() };
 }
 export function cleanSetupLog(value: string, token = ''): string {
   return (token ? value.split(token).join('[redacted]') : value).replace(/(?:hf_[A-Za-z0-9]{10,}|sk-[A-Za-z0-9_-]{20,}|AQ\.[A-Za-z0-9_-]{20,})/g,'[redacted]').replace(/\x1b\[[0-9;]*[A-Za-z]/g,'').trim().slice(-500);
+}
+export function setupTransfer(line:string):Partial<LocalSetupStatus>|undefined {
+  // pip's per-file download counter. It is not overall installation progress.
+  const match=line.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(kB|MB|GB)\b/i);
+  if(!match)return;
+  const unit=match[3].toLowerCase(),factor=unit==='gb'?1e9:unit==='mb'?1e6:1e3;
+  const received=Number(match[1])*factor,total=Number(match[2])*factor;
+  if(total<=0||received>total)return;
+  return {received,total,progress:received/total};
 }
 export function isolatedPythonEnvironment(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, PYTHONNOUSERSITE: '1', PYTHONUNBUFFERED: '1', PYTHONDONTWRITEBYTECODE: '1', PIP_DISABLE_PIP_VERSION_CHECK: '1' };
@@ -88,8 +98,14 @@ export class LocalSetup extends EventEmitter {
       connectedPreset:c && RUNTIME_PRESETS.some(preset=>preset.id===c.preset)?c.preset:undefined,
       connectedModel:c?this.options.currentModel?.():undefined });
   }
-  private update(patch: Partial<LocalSetupStatus>) { this.status={...this.status,...patch,revision:(this.status.revision||0)+1}; this.emit('status',this.getStatus()); }
-  private stage(stage: string, message: string) { this.update({stage,message,progress:undefined,received:undefined,total:undefined,log:[]}); }
+  private update(patch: Partial<LocalSetupStatus>) {
+    const now=Date.now();
+    if(patch.state==='running'&&this.status.state!=='running')Object.assign(patch,{startedAt:now,finishedAt:undefined,stageStartedAt:now,lastActivityAt:now,activity:undefined,transferStartedAt:undefined,received:undefined,total:undefined,progress:undefined});
+    if(patch.state&&patch.state!=='running'&&this.status.state==='running')patch.finishedAt=now;
+    if(patch.received!==undefined){patch.lastActivityAt=now;if(this.status.received===undefined)patch.transferStartedAt=now;}
+    this.status={...this.status,...patch,revision:(this.status.revision||0)+1}; this.emit('status',this.getStatus());
+  }
+  private stage(stage: string, message: string) { this.update({stage,message,stageStartedAt:Date.now(),lastActivityAt:Date.now(),activity:undefined,transferStartedAt:undefined,progress:undefined,received:undefined,total:undefined,log:[]}); }
   private saveCandidate() {
     fs.mkdirSync(this.locations.runtimes,{recursive:true});
     fs.writeFileSync(path.join(this.locations.runtimes,'candidate.json'),JSON.stringify(this.candidate));
@@ -129,12 +145,12 @@ export class LocalSetup extends EventEmitter {
   private checkSpace(request:SetupRequest) {
     const gib=1024**3;
     const candidate=this.candidate,c=this.configured();
-    const fresh=!candidate||!fs.existsSync(candidate.python)||candidate.preset!==request.preset||request.action==='python'||(c?.python===candidate.python&&request.action!=='model');
+    const fresh=!candidate||!fs.existsSync(candidate.python)||candidate.preset!==request.preset||request.action==='python'||(c?.python===candidate.python&&(request.action!=='model'||!candidate.libraries));
     const libraries=fresh||!candidate?.libraries||request.action==='libraries';
     const packages=request.action==='python' ? 0.25 : !libraries ? 0.05 : request.preset==='full-cuda' ? 14 : request.preset==='full-cpu' ? 7 : 1.5;
-    const modelSizes={tiny:75,base:145,small:500,turbo:1600,'bodhan-flex':4900};
+    const modelSizes:Record<string,number>={tiny:75,base:145,small:500,turbo:1600,'bodhan-flex':4900,'bark-pro':1254};
     const needed:[string,number][]=[[this.locations.runtimes,packages*.6*gib],[this.cache,packages*.4*gib]];
-    if(request.action==='model'||request.action==='all')needed.push([this.locations.models,modelSizes[request.model]*1024**2+.1*gib]);
+    if(request.action==='model'||request.action==='all')needed.push([this.locations.models,(modelSizes[request.model]??6300)*1024**2+.1*gib]);
     const drives=new Map<string,{folder:string;bytes:number}>();
     for(const [folder,bytes]of needed){const key=path.parse(physicalPath(folder)).root.toLowerCase();const previous=drives.get(key);drives.set(key,{folder,bytes:(previous?.bytes||0)+bytes});}
     for(const {folder,bytes}of drives.values()){const free=availableBytes(folder);if(free!==undefined&&free<bytes)throw Error(`Not enough free space at ${folder}. Allow at least ${Math.ceil(bytes/gib)} GB on this drive.`);}
@@ -167,7 +183,7 @@ export class LocalSetup extends EventEmitter {
     const models=this.locations.models;
     // Repair into a fresh candidate; never pip-install over the currently connected runtime.
     const c=this.configured();
-    if(!this.candidate || !fs.existsSync(this.candidate.python) || this.candidate.preset!==request.preset || request.action==='python' || (c?.python===this.candidate.python && request.action!=='model')) {
+    if(!this.candidate || !fs.existsSync(this.candidate.python) || this.candidate.preset!==request.preset || request.action==='python' || (c?.python===this.candidate.python && (request.action!=='model'||!this.candidate.libraries))) {
       const candidateRoot=path.join(this.locations.runtimes,randomUUID());fs.mkdirSync(candidateRoot,{recursive:true});
       this.stage('python','Downloading Owlio’s private Python runtime…');
       const archive=path.join(this.cache,`python-${PYTHON_RELEASE.version}.tar.gz`);
@@ -195,8 +211,8 @@ export class LocalSetup extends EventEmitter {
       candidate.libraries=true;candidate.librariesKey=dependencyFingerprint(this.options.speech,request.preset);this.saveCandidate();
     }
     if(request.action==='libraries') return;
-    this.stage('model',`Downloading and verifying ${SETUP_MODELS.find(m=>m.id===request.model)?.name}…`);
-    await this.run(candidate.python,[path.join(this.options.speech,'setup_runtime.py'),'model'],{preset:request.preset,model:request.model,models,token:this.token});
+    this.stage('model',`Downloading and verifying ${SETUP_MODELS.find(m=>m.id===request.model)?.name||request.model.replace(/^hf:/,'')}…`);
+    await this.run(candidate.python,[path.join(this.options.speech,'setup_runtime.py'),'model'],{preset:request.preset,model:request.model,models,language:request.language,token:this.token});
     this.cancelled();this.options.beforeStart?.();
     const config: SpeechRuntimeConfig={python:candidate.python,models,device:request.preset==='full-cuda'?'cuda':'cpu',managed:true,preset:request.preset};
     this.stage('connecting','Connecting the verified runtime to Owlio…');
@@ -229,16 +245,29 @@ export class LocalSetup extends EventEmitter {
     this.cancelled(); if(this.dependencies.run) return this.dependencies.run(executable,args,input);
     return new Promise((resolve,reject)=>{
       const child=spawn(executable,args,{cwd:this.options.speech,windowsHide:true,stdio:['pipe','pipe','pipe'],env:isolatedPythonEnvironment()});this.child=child;
-      let output='',tail='',last=0;
+      let output='',tail='',last=0,pending='';
       const timer=setTimeout(()=>{this.cancel();reject(Error('Setup timed out. Check your connection and retry.'));},2*60*60*1000);
       const consume=(data:Buffer)=>{
-        const clean=cleanSetupLog(data.toString('utf8'),this.token); output=(output+'\n'+clean).slice(-64000);tail=(tail+' '+clean).slice(-1000);
-        if(Date.now()-last>350){this.update({log:[...this.status.log,clean].slice(-5)});last=Date.now();}
+        pending+=data.toString('utf8');
+        const lines=pending.split(/[\r\n]+/);pending=lines.pop()||'';
+        if(pending.length>4096){lines.push(pending);pending='';}
+        const cleaned=lines.map(line=>cleanSetupLog(line,this.token)).filter(Boolean);
+        if(!cleaned.length)return;
+        const clean=cleaned.join('\n');output=(output+'\n'+clean).slice(-64000);tail=(tail+' '+clean).slice(-1000);
+        // Record every line; throttle only notifications, never the stored activity.
+        const activity=cleaned.at(-1)!;
+        const now=Date.now();
+        const newPackage=cleaned.some(line=>/^(?:Collecting |Downloading |Using cached |Installing collected packages:|Successfully installed )/.test(line));
+        const transfer=cleaned.map(setupTransfer).filter(value=>value!==undefined).at(-1);
+        const resetTransfer=newPackage?{received:undefined,total:undefined,progress:undefined,transferStartedAt:undefined}:{};
+        const transferStartedAt=transfer?(newPackage||this.status.total!==transfer.total?now:this.status.transferStartedAt??now):undefined;
+        this.status={...this.status,...resetTransfer,...transfer,...(transfer?{transferStartedAt}:{}),lastActivityAt:now,activity,log:[...this.status.log,...cleaned].slice(-20)};
+        if(Date.now()-last>350){this.update({});last=Date.now();}
       };
       child.stdout!.on('data',consume);child.stderr!.on('data',consume);
       child.on('error',error=>{clearTimeout(timer);reject(error);});
       child.stdin!.on('error',()=>{});
-      child.on('close',code=>{clearTimeout(timer);if(this.child===child)this.child=undefined;
+      child.on('close',code=>{if(pending)consume(Buffer.from('\n'));clearTimeout(timer);if(this.child===child)this.child=undefined;
         if(this.controller?.signal.aborted) reject(Error('Setup cancelled.'));
         else if(code!==0) reject(Error(tail || `Speech setup exited with ${code}.`));
         else resolve(output);

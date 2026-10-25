@@ -7,6 +7,7 @@ from unittest.mock import patch
 from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import model_manager as module
+from speech_backends import BARK_ID, BARK_REPO, BUILTIN_MODELS
 
 
 class ModelTests(unittest.TestCase):
@@ -77,6 +78,41 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(self.manager.normalize('large-v3-turbo'), 'turbo')
         with self.assertRaises(ValueError):
             self.manager.normalize('../../anything')
+
+    def test_bark_is_listed_without_network_and_url_reuses_builtin_download(self):
+        row = next(row for row in self.manager.catalogue()['models'] if row['id'] == BARK_ID)
+        self.assertEqual(row['languages'], ['en'])
+        self.assertEqual(row['engine'], 'parakeet-tdt')
+        self.assertFalse(row['downloaded'])
+        self.assertEqual(self.manager.normalize('hf:' + BARK_REPO), BARK_ID)
+        self.assertEqual(self.manager.normalize(BARK_REPO.lower()), BARK_ID)
+        with patch.object(self.manager, 'start_job', return_value={}) as start:
+            self.manager.import_url('https://huggingface.co/' + BARK_REPO)
+            start.assert_called_once_with(BARK_ID, 'download')
+
+    def test_bark_download_pins_weights_assets_and_notice_without_activating(self):
+        with patch.object(self.manager, 'cached_path', side_effect=[None, self.temp.name]), patch.object(module, 'download_repository') as download:
+            self.manager.download(BARK_ID)
+            download.assert_called_once_with(BUILTIN_MODELS[BARK_ID], self.temp.name)
+        self.assertIn('NOTICE', BUILTIN_MODELS[BARK_ID]['files'])
+        self.assertEqual(self.manager.active_model, 'base')
+
+    def test_missing_parakeet_dependencies_do_not_suspend_current_model(self):
+        previous = SimpleNamespace(network=SimpleNamespace(to=unittest.mock.Mock()))
+        self.manager.engine, self.manager.loaded_model = previous, 'base'
+        with patch.object(self.manager, 'cached_path', return_value=self.temp.name), patch.object(module, 'runtime_error', return_value='Repair Full speech'):
+            with self.assertRaisesRegex(RuntimeError, 'Repair Full speech'):
+                self.manager.load(BARK_ID)
+        previous.network.to.assert_not_called()
+        self.assertIs(self.manager.engine, previous)
+
+    def test_bark_uses_registered_engine_and_preserves_runtime_metadata(self):
+        engine = SimpleNamespace(model=SimpleNamespace(device='cuda', compute_type='bfloat16'))
+        with patch.object(self.manager, 'cached_path', return_value=self.temp.name), patch.object(module, 'runtime_error', return_value=None), patch.object(module, 'load_engine', return_value=engine) as load:
+            self.assertIs(self.manager.load(BARK_ID), engine)
+        self.assertEqual(load.call_args.args[:2], ('parakeet-tdt', self.temp.name))
+        self.assertEqual(load.call_args.kwargs['languages'], ['en'])
+        self.assertEqual(self.manager.catalogue()['runtime']['compute_type'], 'bfloat16')
 
     def test_native_runtime_polling_is_safe_while_model_is_suspended(self):
         class NativeModel:

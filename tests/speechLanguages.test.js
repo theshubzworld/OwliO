@@ -5,6 +5,16 @@ const path=require('node:path');
 const vm=require('node:vm');
 const languages=require('../dist/shared/speechLanguages');
 const root=path.resolve(__dirname,'..');
+test('Bark Pro supports English only and never replaces a Hindi or Hinglish model',()=>{
+  for(const id of ['bark-pro','hf:ConwayResearch/Underdog-Bark-3.0-Pro']){
+    assert.deepEqual(languages.documentedModelLanguages(id),['en']);
+    assert.equal(languages.supportsSpeechLanguage('local',id,'en'),true);
+    assert.equal(languages.supportsSpeechLanguage('local',id,'hinglish'),false);
+    assert.equal(languages.supportsSpeechLanguage('local',id,'hi'),false);
+    assert.equal(languages.selectSpeechModel('hi',id,[{id,downloaded:true},{id:'base',downloaded:true}]).model,'base');
+    assert.equal(languages.selectSpeechModel('en',id,[{id,downloaded:true}]).model,id);
+  }
+});
 function load(name,replacements={},extra={}){
   const exports={};vm.runInNewContext(fs.readFileSync(path.join(root,'dist/main',name),'utf8'),{exports,require:name=>replacements[name]||(name.startsWith('.')?require(path.join(root,'dist/main',name)):require(name)),structuredClone,Buffer,Blob,FormData,AbortSignal,console,...extra});return exports;
 }

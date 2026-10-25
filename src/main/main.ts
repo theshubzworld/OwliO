@@ -687,6 +687,7 @@ app.whenReady().then(() => {
         if(checkingSpeech) await speechServer.ensure(current);
         const catalogue=await getLocalModels();
         if(checkingSpeech&&(!catalogue.speech.online||!catalogue.speech.models?.some((model:any)=>model.id===target.localSttModel&&model.downloaded))) throw new Error('Download the selected speech model before saving settings.');
+        if(checkingSpeech&&catalogue.speech.models?.find((model:any)=>model.id===target.localSttModel)?.runtime_ready===false)throw new Error('Set up the selected speech model before saving settings. It needs additional speech libraries.');
         const declared=checkingSpeech?catalogue.speech.models?.find((model:any)=>model.id===target.localSttModel)?.languages:undefined;
         if(declared?.length&&target.dictationLanguage!=='auto'&&(!declared.includes(target.dictationLanguage==='hinglish'?'hi':target.dictationLanguage)||target.dictationLanguage==='hinglish'&&!declared.includes('en')))throw new Error('This custom model does not declare the selected language. Choose a compatible speech model.');
         if(checkingWriter&&(!catalogue.formatting.online||!catalogue.formatting.models?.some((model:any)=>model.name===target.localLlmModel||model.name===target.localLlmModel+':latest'))) throw new Error('Start Ollama and install the selected Writing AI model before enabling voice rewrites.');

@@ -13,6 +13,13 @@ import server
 
 
 class ResponseTests(unittest.TestCase):
+    def test_bark_english_only_metadata_blocks_hinglish_before_loading(self):
+        for language in ('hi', 'hinglish', 'fr'):
+            with patch.object(server, 'load_whisper_model') as loader:
+                response = self.client.post('/v1/audio/transcriptions', data={'model':'bark-pro','language':language}, files={'file':('test.wav',self.wav(10000),'audio/wav')})
+            self.assertEqual(response.status_code, 400)
+            loader.assert_not_called()
+
     def test_documented_language_mismatch_is_rejected_before_model_inference(self):
         with patch.object(server.model_manager, 'supported_languages', return_value=['hi','en']), patch.object(server, 'load_whisper_model') as loader:
             response = self.client.post('/v1/audio/transcriptions', data={'language':'ta'}, files={'file':('test.wav',self.wav(10000),'audio/wav')})

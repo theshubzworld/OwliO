@@ -5,6 +5,7 @@ import type { AppSettings } from '../main/store';
 import { AudioRecorder } from './audioRecorder';
 import owlioLogo from '../../assets/brand/owlio-logo.png';
 import { UsageConsent } from './AccountPrivacy';
+import {SetupProgress} from './SetupProgress';
 
 type SetupApi = {
   getLocalSetup:()=>Promise<LocalSetupStatus>; startLocalSetup:(request:SetupRequest)=>Promise<LocalSetupStatus>;
@@ -14,7 +15,7 @@ type SetupApi = {
   getSettings:()=>Promise<AppSettings>; updateSettings:(patch:Partial<AppSettings>)=>Promise<AppSettings>;
 };
 const api=()=> (window as unknown as {api:SetupApi}).api;
-type Props = { onConnected:(patch:Partial<AppSettings>)=>void; firstRun?:boolean; onFinish?:()=>void; onOpenWizard?:()=>void; currentModel?:string; initialModel?:string; initialLanguage?:string; onManageModels?:()=>void };
+type Props = { onConnected:(patch:Partial<AppSettings>)=>void; firstRun?:boolean; onFinish?:()=>void; onOpenWizard?:()=>void; currentModel?:string; initialModel?:string; initialLanguage?:string; onManageModels?:()=>void; hideProgress?:boolean };
 
 function SetupMicrophoneTest() {
   const recorder=useRef<AudioRecorder|null>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),mounted=useRef(true);
@@ -36,7 +37,7 @@ function SetupMicrophoneTest() {
   </div>;
 }
 
-export function LocalSetupPanel({onConnected,firstRun=false,onFinish,onOpenWizard,currentModel,initialModel,initialLanguage,onManageModels}:Props) {
+export function LocalSetupPanel({onConnected,firstRun=false,onFinish,onOpenWizard,currentModel,initialModel,initialLanguage,onManageModels,hideProgress=false}:Props) {
   const [status,setStatus]=useState<LocalSetupStatus|null>(null),[presetChoice,setPresetChoice]=useState<RuntimePreset|'auto'>('auto'),[model,setModel]=useState<SetupModel>(SETUP_MODELS.find(item=>item.id===initialModel)?.id||'base');
   const [token,setToken]=useState(''),[error,setError]=useState(''),[requesting,setRequesting]=useState(false);
   const [editingPackage,setEditingPackage]=useState(false);
@@ -132,7 +133,7 @@ export function LocalSetupPanel({onConnected,firstRun=false,onFinish,onOpenWizar
       <button type="button" className="btn btn-primary" disabled={busy||!status} onClick={()=>{void start('all');}}><Download size={16}/>{status?.state==='failed'||status?.state==='cancelled'?'Retry local speech setup':configured?'Repair and connect speech':'Download and set up local speech'}</button>
     </div>
     <details className="settings-disclosure setup-individual"><summary>Advanced installation<span>Package and component setup</span></summary>
-      <label>Package<select id="setup-package" className="select" aria-label="Speech package" value={presetChoice} disabled={busy} onChange={event=>setPresetChoice(event.target.value as RuntimePreset|'auto')}><option value="auto">Automatic</option>{RUNTIME_PRESETS.map(item=><option key={item.id} value={item.id} disabled={item.id==='whisper-cpu'&&model==='bodhan-flex'}>{item.id==='whisper-cpu'?'Lightweight CPU':item.id==='full-cpu'?'Full CPU':'NVIDIA GPU'}</option>)}</select></label>
+      <label>Package<select id="setup-package" className="select" aria-label="Speech package" value={presetChoice} disabled={busy} onChange={event=>setPresetChoice(event.target.value as RuntimePreset|'auto')}><option value="auto">Automatic</option>{RUNTIME_PRESETS.map(item=><option key={item.id} value={item.id} disabled={item.id==='whisper-cpu'&&SETUP_MODELS.find(entry=>entry.id===model)?.full}>{item.id==='whisper-cpu'?'Lightweight CPU':item.id==='full-cpu'?'Full CPU':'NVIDIA GPU'}</option>)}</select></label>
       <p className="muted">{presetChoice==='auto'?'Reuse a compatible setup or install the CPU package this model needs.':RUNTIME_PRESETS.find(item=>item.id===presetChoice)?.detail}</p>
       <p className="muted">Install components in order: Python, libraries, then model.</p>
       <div className="setup-actions"><button type="button" className="btn btn-secondary" disabled={busy||!status} onClick={()=>{void start('python');}}>Download Python</button><button type="button" className="btn btn-secondary" disabled={busy||!status} onClick={()=>{void start('libraries');}}>Install / repair libraries</button><button type="button" className="btn btn-secondary" disabled={busy||!status} onClick={()=>{void start('model');}}>Download / verify model</button></div>
@@ -140,14 +141,7 @@ export function LocalSetupPanel({onConnected,firstRun=false,onFinish,onOpenWizar
       {status&&<p className="muted setup-path">Runtime: {status.runtimeFolder}<br/>Models: {status.modelFolder}</p>}
     </details>
     </div>}
-    {busy&&<div className="setup-actions"><button type="button" className="btn btn-secondary" disabled={status?.stage==='connecting'} onClick={()=>{void api().cancelLocalSetup().catch(error=>setError(error.message));}}>Cancel setup</button></div>}
-    {status&&(!configured||status.stage!=='idle'||status.state!=='idle')&&<div className={`setup-progress ${status.state}`} role="status" aria-live="polite">
-      <strong>{status.message}</strong>
-      {busy&&<progress aria-label="Local setup progress" {...(typeof status.progress==='number'?{value:status.progress,max:1}:{})}/>}
-      {busy&&status.received!==undefined&&<span>{(status.received/1024**2).toFixed(1)} MB {status.stage==='copying'?'copied':'downloaded'}{status.total?` of ${(status.total/1024**2).toFixed(1)} MB`:''}</span>}
-      {status.error&&<p className="shortcut-error">{status.error}</p>}
-      {!!status.log.length&&<details><summary>Download details</summary><pre>{status.log.join('\n')}</pre></details>}
-    </div>}
+    {!hideProgress&&status&&(!configured||status.stage!=='idle'||status.state!=='idle')&&<SetupProgress status={status} onCancel={()=>{void api().cancelLocalSetup().catch(error=>setError(error.message));}}/>}
     {error&&<p role="alert" className="shortcut-error">{error}</p>}
     {(status?.modelInstalled&&status.state==='ready')&&<><SetupMicrophoneTest/>{firstRun&&editingPackage&&<button type="button" className="btn btn-primary setup-finish" onClick={onFinish}>Finish setup<ArrowRight size={16}/></button>}</>}
     {!firstRun&&<>{onOpenWizard&&<button type="button" className="btn btn-secondary" disabled={busy} onClick={onOpenWizard}><Settings2 size={15}/>Open guided setup</button>}</>}

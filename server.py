@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from model_manager import ModelManager, MODEL_IDS
 from flex_backend import FLEX_ID, has_audio_signal
 from faster_whisper import WhisperModel
+from speech_backends import BUILTIN_MODELS
 import uvicorn
 
 # Fix PyAV 19+ incompatibility where metadata_errors was removed from av.open
@@ -36,8 +37,10 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
-DEFAULT_MODEL = os.getenv("WHISPER_MODEL", "base").lower().strip()
-if DEFAULT_MODEL not in (*MODEL_IDS, FLEX_ID, 'large', 'large-v3-turbo', 'whisper-1'):
+DEFAULT_MODEL = os.getenv("WHISPER_MODEL", "base").strip()
+if not DEFAULT_MODEL.startswith('hf:'):
+    DEFAULT_MODEL = DEFAULT_MODEL.lower()
+if DEFAULT_MODEL not in (*MODEL_IDS, FLEX_ID, *BUILTIN_MODELS, 'large', 'large-v3-turbo', 'whisper-1') and not DEFAULT_MODEL.startswith('hf:'):
     print(f"[WHISPER] Unsupported WHISPER_MODEL={DEFAULT_MODEL!r}; using 'base'.")
     DEFAULT_MODEL = "base"
 DEVICE = os.getenv("WHISPER_DEVICE", "auto")
@@ -55,7 +58,7 @@ def root():
         "status": "online",
         "service": "Owlio Local Speech Server",
         "default_model": model_manager.active_model,
-        "available_models": list(MODEL_IDS) + [FLEX_ID],
+        "available_models": list(MODEL_IDS) + [FLEX_ID] + list(BUILTIN_MODELS),
         "endpoint": "/v1/audio/transcriptions"
     }
 

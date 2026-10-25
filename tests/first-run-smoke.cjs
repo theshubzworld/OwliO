@@ -57,7 +57,7 @@ app.whenReady().then(async()=>{
   await wait(()=>js('!!document.querySelector("#copy-existing-models")'));
   await js('document.querySelector("#copy-existing-models").click();void 0;');await wait(()=>copied===1);
   await wait(()=>js('document.querySelector("#choose-storage-root").disabled'));assert.equal(await js('document.querySelector(".setup-progress").textContent.includes("copied")'),true);
-  await js('[...document.querySelectorAll(".setup-actions button")].find(b=>b.textContent.includes("Cancel setup")).click();void 0;');await wait(()=>cancelled===3);
+  await js('document.querySelector(".setup-progress button").click();void 0;');await wait(()=>cancelled===3);
   status={...status,state:'idle',runtimeConfigured:false,connectedModels:undefined,received:undefined,total:undefined};window.webContents.send('local-setup-status',status);
   await wait(()=>js('!document.querySelector("#reset-storage").disabled'));
   await js('document.querySelector("#reset-storage").click();void 0;');await wait(()=>status.defaultStorage);
@@ -68,7 +68,7 @@ app.whenReady().then(async()=>{
   await wait(()=>js('document.querySelector("#setup-model").value==="base"'));
   await js('document.querySelector(".local-setup .setup-actions .btn-primary").click();void 0;');await wait(()=>starts.length===1);
   assert.equal(starts[0].action,'all');assert.equal(starts[0].preset,'whisper-cpu');await wait(()=>js('!!document.querySelector("progress")'));await shot('progress');
-  await js('[...document.querySelectorAll(".setup-actions button")].find(b=>b.textContent.includes("Cancel setup")).click();void 0;');await wait(()=>cancelled===4);
+  await js('document.querySelector(".setup-progress button").click();void 0;');await wait(()=>cancelled===4);
   status={...status,state:'failed',stage:'failed',message:'Setup needs attention.',error:'Synthetic interrupted download'};window.webContents.send('local-setup-status',status);
   await wait(()=>js('document.querySelector(".local-setup").textContent.includes("Retry local speech setup")'));
   await js('document.querySelector(".local-setup .setup-actions .btn-primary").click();void 0;');await wait(()=>starts.length===2);
@@ -96,6 +96,17 @@ app.whenReady().then(async()=>{
   await js('document.querySelector(".local-setup .setup-actions .btn-primary").click();void 0;');
   await wait(()=>starts.length===previousStarts+1);
   assert.equal(starts.at(-1).model,'bodhan-flex');assert.equal(starts.at(-1).language,'bho');assert.equal(starts.at(-1).preset,'full-cpu');
+  // Bark is offered before any runtime exists, and cannot use the lightweight package.
+  status={...status,state:'idle',stage:'idle',runtimeConfigured:false,modelInstalled:false,error:undefined};
+  store.updateSettings({setupCompleted:true,provider:'local',localSttModel:'bark-pro',dictationLanguage:'en'});
+  await window.loadFile(path.join(root,'dist/renderer/index.html'),{query:{view:'dashboard',tab:'models'}});
+  await wait(()=>js('document.querySelector("#setup-model")?.value==="bark-pro"'));
+  assert.equal(await js('document.querySelector("#setup-package option[value=whisper-cpu]").disabled'),true);
+  await js(`(()=>{const select=document.querySelector('#setup-package');select.value='full-cuda';select.dispatchEvent(new Event('change',{bubbles:true}));})();void 0;`);
+  const beforeBark=starts.length;
+  await js('document.querySelector(".local-setup .setup-actions .btn-primary").click();void 0;');
+  await wait(()=>starts.length===beforeBark+1);
+  assert.equal(starts.at(-1).model,'bark-pro');assert.equal(starts.at(-1).language,'en');assert.equal(starts.at(-1).preset,'full-cuda');
   console.log('PASS: first run, skip/reopen, cloud encryption, custom/advanced storage, copy/cache controls, packages/Flex access, progress/cancel/retry, microphone error and Settings setup.');
   window.destroy();app.quit();
 }).catch(error=>{console.error(error.stack);app.exit(1);});

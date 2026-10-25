@@ -11,6 +11,7 @@ from faster_whisper.tokenizer import _LANGUAGE_CODES
 from huggingface_hub import try_to_load_from_cache
 from huggingface_models import repository_from_url, inspect_repository, download_repository
 from flex_backend import FLEX_LANGUAGE_CODES, FLEX_ID, FLEX_REPO, cached_flex, download_flex, flex_directory
+from speech_backends import BUILTIN_MODELS, runtime_error, load_engine
 
 MODEL_IDS = ("tiny", "base", "small", "medium", "large-v3", "turbo")
 MODEL_REPOS = {name: utils._MODELS[name] for name in MODEL_IDS}
@@ -77,18 +78,21 @@ class ModelManager:
         name = {"large": "large-v3", "large-v3-turbo": "turbo"}.get(name, name)
         if name == 'hf:' + FLEX_REPO:
             name = FLEX_ID
-        if name not in MODEL_IDS and name != FLEX_ID and name not in self._custom:
+        for builtin, entry in BUILTIN_MODELS.items():
+            if str(name).removeprefix('hf:').lower() == entry['repository'].lower():
+                name = builtin
+        if name not in MODEL_IDS and name != FLEX_ID and name not in self._custom and name not in BUILTIN_MODELS:
             if ("hf:" + name) in self._custom:
                 return "hf:" + name
-            raise ValueError("Choose a supported Whisper model: " + ", ".join(MODEL_IDS))
+            raise ValueError("Choose a supported speech model: " + ", ".join((*MODEL_IDS, FLEX_ID, *BUILTIN_MODELS)))
         return name
 
     def cached_path(self, name):
         name = self.normalize(name)
         if name == FLEX_ID:
             return cached_flex(self.cache_dir)
-        if name in self._custom:
-            entry = self._custom[name]
+        if name in self._custom or name in BUILTIN_MODELS:
+            entry = BUILTIN_MODELS.get(name) or self._custom[name]
             files = [try_to_load_from_cache(entry["repository"], file, revision=entry["revision"], cache_dir=self.cache_dir) for file in entry["files"]]
             if files and all(isinstance(file, str) and Path(file).is_file() for file in files):
                 return str(Path(files[0]).parent)
@@ -106,7 +110,7 @@ class ModelManager:
             return list(FLEX_LANGUAGE_CODES)
         if name in MODEL_IDS:
             return [code for code in _LANGUAGE_CODES if code != 'yue' or name in ('large-v3', 'turbo')]
-        entry = self._custom[name]
+        entry = BUILTIN_MODELS.get(name) or self._custom[name]
         if entry['repository'].lower() == 'trelis/whisper-hinglish-preview':
             return ['hi', 'en']
         return entry.get('languages')
@@ -119,11 +123,12 @@ class ModelManager:
             rows.append({"id": name, "name": LABELS[name], "repository": MODEL_REPOS[name],
                          "languages": [code for code in _LANGUAGE_CODES if code != "yue" or name in ("large-v3", "turbo")], "downloaded": bool(cached), "bytes": Path(cached, "model.bin").stat().st_size if cached else None})
         with self._lock:
-            custom = list(self._custom.values())
+            custom = list(BUILTIN_MODELS.values()) + list(self._custom.values())
             jobs = [dict(job) for job in self._jobs.values()]
             runtime = dict(self._runtime)
             loaded_model, active_model = self.loaded_model, self.active_model
-        rows.extend({key: entry[key] for key in ("id", "name", "repository", "engine", "bytes")} | {"languages":entry.get("languages"),"downloaded": bool(self.cached_path(entry["id"]))} for entry in custom)
+        rows.extend({key: entry[key] for key in ("id", "name", "repository", "engine", "bytes")} | {"languages":entry.get("languages"),"downloaded": bool(self.cached_path(entry["id"])),
+                     "runtime_ready": runtime_error(entry['engine']) is None, "runtime_error": runtime_error(entry['engine'])} for entry in custom)
         rows.append({'id': FLEX_ID, 'name': 'Bodhan Flex · 27 languages', 'repository': FLEX_REPO,
                      'engine': 'bodhan-flex', 'downloaded': bool(self.cached_path(FLEX_ID)),
                      'bytes': 4890451120, 'languages': list(FLEX_LANGUAGE_CODES)})
@@ -165,6 +170,9 @@ class ModelManager:
             elif name == FLEX_ID:
                 target_dir = Path(flex_directory(self.cache_dir))
                 _remove_dir(target_dir)
+            elif name in BUILTIN_MODELS:
+                repo = BUILTIN_MODELS[name]['repository']
+                _remove_dir(Path(self.cache_dir) / ('models--' + repo.replace('/', '--')))
             elif name in MODEL_IDS:
                 repo = MODEL_REPOS[name]
                 hf_folder = Path(self.cache_dir) / ("models--" + repo.replace("/", "--"))
@@ -188,6 +196,10 @@ class ModelManager:
             cached = self.cached_path(name)
             if not cached:
                 raise ValueError(f"{LABELS.get(name, name)} is not downloaded. Open Settings → Local models and download it first.")
+            entry = BUILTIN_MODELS.get(name) or self._custom.get(name)
+            # Check missing dependencies before suspending a working model.
+            if entry and runtime_error(entry['engine']):
+                raise RuntimeError(runtime_error(entry['engine']))
             # Only one model needs CUDA memory. Restore the old engine if loading its replacement fails.
             previous = self.engine
             previous_model = getattr(previous, "model", None)
@@ -201,9 +213,9 @@ class ModelManager:
                 if name == FLEX_ID:
                     from flex_backend import FlexEngine
                     engine = FlexEngine(cached, device=self.device)
-                elif name in self._custom and self._custom[name]["engine"] == "transformers":
-                    from transformers_whisper import TransformersWhisper
-                    engine = TransformersWhisper(cached, device=self.device, model_id=name)
+                elif entry and entry['engine'] != 'faster-whisper':
+                    engine = load_engine(entry['engine'], cached, self.device, model_id=name,
+                                         repository=entry['repository'], languages=entry.get('languages'))
                 else:
                     try:
                         from cuda_runtime import prepare_cuda
@@ -261,6 +273,9 @@ class ModelManager:
         repo = repository_from_url(url)
         if repo == FLEX_REPO:
             return self.start_job(FLEX_ID, 'download')
+        for name, entry in BUILTIN_MODELS.items():
+            if repo.lower() == entry['repository'].lower():
+                return self.start_job(name, 'download')
         name = "hf:" + repo
         with self._lock:
             if name in self._custom:
@@ -293,20 +308,25 @@ class ModelManager:
             with self._lock:
                 job.update(status="failed", error=str(error))
 
+    def download(self, name):
+        """Shared setup/background path for every supported architecture."""
+        name = self.normalize(name)
+        if not self.cached_path(name):
+            if name == FLEX_ID:
+                download_flex(self.cache_dir)
+            elif name in self._custom or name in BUILTIN_MODELS:
+                download_repository(BUILTIN_MODELS.get(name) or self._custom[name], self.cache_dir)
+            else:
+                utils.download_model(MODEL_REPOS[name], cache_dir=self.cache_dir)
+        if not self.cached_path(name):
+            raise RuntimeError('Download did not produce a complete model. Please retry.')
+
     def _run_job(self, job):
         try:
             with self._lock:
                 job["status"] = "downloading" if job["action"] == "download" else "loading"
             if job["action"] == "download":
-                if not self.cached_path(job["model"]):
-                    if job['model'] == FLEX_ID:
-                        download_flex(self.cache_dir)
-                    elif job["model"] in self._custom:
-                        download_repository(self._custom[job["model"]], self.cache_dir)
-                    else:
-                        utils.download_model(MODEL_REPOS[job["model"]], cache_dir=self.cache_dir)
-                if not self.cached_path(job["model"]):
-                    raise RuntimeError("Download did not produce a complete model. Please retry.")
+                self.download(job['model'])
             else:
                 self.load(job["model"])
             with self._lock:

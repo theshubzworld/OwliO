@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Speak naturally. Watch your words appear anywhere on Windows.</strong><br>
-  A fast, privacy-first desktop voice typing companion powered by local Whisper.<br>
+  A fast, privacy-first desktop voice typing companion powered by local speech models.<br>
   Dictate effortlessly across 100+ global languages, regional dialects, and bilingual speech in any app.
 </p>
 
@@ -33,7 +33,7 @@
 
 **Owlio** is an open-source voice typing companion for Windows 10 and 11. Press a global shortcut, speak naturally into your microphone, and Owlio transcribes your thoughts directly into whichever text field currently has focus—whether you're writing code in VS Code, drafting an email in Outlook, chatting on Slack, or taking notes in Notion.
 
-Unlike cloud-dependent dictation services that stream your voice to remote servers, Owlio runs **local speech recognition models (Whisper)** directly on your PC’s CPU or NVIDIA GPU. Your audio stays private, dictation works even without an internet connection, and transcription latency is near-instantaneous.
+Owlio runs **local speech recognition models (Whisper, Bodhan Flex and Parakeet TDT)** directly on your PC’s CPU or NVIDIA GPU. Local dictation works offline after setup; speed depends on the model, recording length and hardware.
 
 ---
 
@@ -66,6 +66,16 @@ Full speech recognition with automatic language detection, including:
 - Seamless code-switching: mix Hindi and English naturally in the same sentence.
 - Choose whether to output recognized words in native Devanagari script (`कल शाम की मीटिंग`) or romanized English letters (`Kal shaam ki meeting`).
 
+### English dictation with Underdog Bark 3.0 Pro
+
+Select **Speech & models → Change speech model → Underdog Bark 3.0 Pro · English**. Set the spoken language to English (or automatic detection), then choose **Set up model** / **Download**. The model has about 1.25 GB of weights and needs a Full speech package. Choose the NVIDIA GPU package in Advanced local speech for CUDA acceleration; CPU execution is also supported. Setup builds a separate runtime and connects it only after the model loads successfully.
+
+Bark Pro is English-only and preserves spoken fillers. Owlio's optional writing cleanup and dictionary replacements run afterward. Whisper vocabulary prompts do not apply to Parakeet decoding. Recordings are processed in bounded, overlapping chunks to limit memory use.
+
+Advanced Hugging Face imports accept CTranslate2 Whisper, Transformers Whisper, and Transformers **Parakeet TDT** checkpoints with safetensors and processor/tokenizer assets. Native NeMo archives, Parakeet CTC, GGUF and other architectures require a separate backend and are rejected. Imported language coverage comes from the model card; it is never inferred from the model name. Repository Python code is not downloaded or executed.
+
+Source: [Bark Pro model card](https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Pro). The recommended checkpoint is pinned to revision `4b5c51e04aa8d16dda9ecdff71bc29f7360149e4`; its CC-BY-4.0 attribution is documented in [speech model notices](docs/speech-model-notices.md) and downloaded with the weights.
+
 ---
 
 ## 📥 Download
@@ -74,7 +84,7 @@ Pre-built Windows 64-bit installers are published on the official [GitHub Releas
 
 | File | Platform | Architecture | SHA-256 Checksum |
 | :--- | :--- | :--- | :--- |
-| **[`Owlio-Setup-1.0.19.exe`](https://github.com/theshubzworld/OwliO/releases/latest)** | Windows 10 / 11 | x64 | `05401AFEC14C002A06C8D3F466776F4A2719796DDD61E3257EBCDFD12409468D` |
+| **Owlio-Setup-1.0.21.exe (local build; not published yet)** | Windows 10 / 11 | x64 | `5D7FD3E86FE5DDEAAC432E8222CFFF112528F0C8C06FB2D161096CA1E631CA47` |
 
 > **Note on Windows SmartScreen**: The installer is currently unsigned. If Windows SmartScreen displays a warning, click *More info* → *Run anyway*. You can verify the published SHA-256 hash above against your download.
 

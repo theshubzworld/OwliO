@@ -1,5 +1,11 @@
-const builtins = new Set(['tiny', 'base', 'small', 'medium', 'large-v3', 'turbo', 'bodhan-flex']);
+const builtins = new Set(['tiny', 'base', 'small', 'medium', 'large-v3', 'turbo', 'bodhan-flex', 'bark-pro']);
 const repoPattern = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\/[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/;
+
+export function speechModelLabel(model: string): string {
+  if(model==='bark-pro'||model.toLowerCase()==='hf:conwayresearch/underdog-bark-3.0-pro')return 'Underdog Bark 3.0 Pro';
+  if(model==='bodhan-flex')return 'Bodhan Flex';
+  return model.replace(/^hf:/,'');
+}
 
 export function huggingFaceRepository(value: unknown): string {
   if (typeof value !== 'string' || value.length > 300) throw new Error('Enter a Hugging Face model URL or owner/model name.');

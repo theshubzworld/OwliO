@@ -1,7 +1,7 @@
 {
   "name": "owlio",
   "productName": "Owlio",
-  "version": "1.0.19",
+  "version": "1.0.21",
   "description": "Ultra-fast, context-aware AI voice dictation for Windows",
   "main": "dist/main/main.js",
   "scripts": {
@@ -56,6 +56,8 @@
           "model_manager.py",
           "huggingface_models.py",
           "transformers_whisper.py",
+          "parakeet_backend.py",
+          "speech_backends.py",
           "flex_backend.py",
           "cuda_runtime.py",
           "setup_runtime.py",

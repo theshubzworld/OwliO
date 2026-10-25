@@ -11,6 +11,7 @@ const profile = fs.mkdtempSync(path.join(output, 'settings-navigation-'));
 app.setPath('userData', profile);
 app.disableHardwareAcceleration();
 const {Store} = require('../dist/main/store');
+const {TERMS_VERSION,PRIVACY_VERSION,POLICY_HASH}=require('../dist/shared/legal');
 const store = new Store(profile);
 const reportPath = path.join(output, 'settings-navigation-result.json');
 const waitFor = async check => {
@@ -21,6 +22,8 @@ const waitFor = async check => {
 
 app.whenReady().then(async () => {
   const patches = [], errors = [];
+  ipcMain.handle('account-status',()=>({configured:true,user:{id:'synthetic-settings-user'},signingIn:false,access:{blocked:false,checkedAt:Date.now(),termsAccepted:true,termsVersion:TERMS_VERSION,privacyVersion:PRIVACY_VERSION,policyHash:POLICY_HASH}}));
+  ipcMain.handle('analytics-status',()=>({configured:false,enabled:false,queued:0}));
   let modelReads = 0;
   store.updateSettings({provider:'local', localSttModel:'hf:Trelis/whisper-hinglish-preview', formattingProvider:'basic', setupCompleted:true, dictationLanguage:'hinglish'});
   const catalogue = {speech:{online:true,loaded_model:'hf:Trelis/whisper-hinglish-preview',models:[{id:'hf:Trelis/whisper-hinglish-preview',name:'Trelis Hinglish',downloaded:true}, {id:'bodhan-flex',name:'Bodhan Flex',downloaded:true},{id:'small',name:'Whisper small',downloaded:false},{id:'turbo',name:'Whisper large v3 turbo',downloaded:false}],jobs:[]},formatting:{online:false},pulls:[]};
@@ -34,9 +37,10 @@ app.whenReady().then(async () => {
   ipcMain.handle('get-scratchpad', () => '');
   ipcMain.handle('cancel-shortcut', () => {});
   ipcMain.handle('get-local-models', () => { modelReads++; return catalogue; });
-  let connectedPreset='full-cpu';let setupState='idle';
+  let connectedPreset='full-cpu';let setupState='idle';let setupTelemetry={};let setupCancels=0;
   const starts=[];ipcMain.handle('start-local-setup',(_event,request)=>{starts.push(request);setupState='running';return {state:'running',stage:'model',runtimeConfigured:true,connectedPreset:'full-cpu',log:[]};});
-  ipcMain.handle('get-local-setup', () => ({state:setupState,stage:setupState==='running'?'model':'idle',message:'Choose a speech package to get started.',runtimeConfigured:true,managed:true,connectedPreset,connectedModel:store.getSettings().localSttModel,modelInstalled:setupState==='ready',log:[]}));
+  ipcMain.handle('get-local-setup', () => ({state:setupState,stage:setupState==='running'?'model':'idle',message:'Choose a speech package to get started.',runtimeConfigured:true,managed:true,connectedPreset,connectedModel:store.getSettings().localSttModel,modelInstalled:setupState==='ready',log:[],...setupTelemetry}));
+  ipcMain.handle('cancel-local-setup',()=>{setupCancels++;setupState='cancelled';setupTelemetry={...setupTelemetry,finishedAt:Date.now(),message:'Setup cancelled. Your previous configuration is unchanged.'};return {state:setupState};});
   ipcMain.handle('speech-model-action', (_event, model) => { catalogue.speech.loaded_model = model; return store.updateSettings({localSttModel:model}); });
   const window = new BrowserWindow({show:false,width:1180,height:880,webPreferences:{preload:path.join(root,'dist/preload/preload.js'),contextIsolation:true,offscreen:true,backgroundThrottling:false}});
   window.webContents.session.setPermissionRequestHandler((_contents,_permission,callback) => callback(false));
@@ -71,6 +75,18 @@ app.whenReady().then(async () => {
   assert.equal(await js('document.querySelector("#setup-package").closest("details").open'),false);
   await click('#repair-speech-package');
   await screenshot('simplified-speech');
+  assert.equal(await js('document.querySelector("#speech-provider").labels.length'),1);
+  assert.equal(await js('document.querySelector("#spoken-language").labels.length'),1);
+  assert.equal(await js('document.querySelector(".speech-connection").open'),false);
+  await js(`[...document.querySelectorAll('.speech-language-shortcuts button')].find(button=>button.textContent==='English').click();void 0;`);
+  await waitFor(()=>js('document.querySelector("#spoken-language").value==="en"&&!document.querySelector("#spoken-language").disabled'));
+  assert.equal(store.getSettings().dictationLanguage,'hinglish','Language shortcuts remain staged until Save settings');
+  assert.equal(await js(`[...document.querySelectorAll('.speech-language-shortcuts button')].find(button=>button.textContent==='English').getAttribute('aria-pressed')`),'true');
+  await js(`[...document.querySelectorAll('.speech-language-shortcuts button')].find(button=>button.textContent==='Hinglish').click();void 0;`);
+  await waitFor(()=>js('document.querySelector("#spoken-language").value==="hinglish"&&!document.querySelector("#spoken-language").disabled'));
+  window.setSize(960,720);
+  assert.ok(await js('document.querySelector(".settings-basics").scrollWidth<=document.querySelector(".settings-basics").clientWidth+1'));
+  await screenshot('speech-controls-narrow');window.setSize(1180,880);
   // Whisper exposes other languages, with one saved choice used throughout the app.
   await choose('[aria-label="Spoken language"]','ta');await waitFor(()=>js('!!document.querySelector("#language-model-selection")&&document.querySelector("#speech-model").value==="bodhan-flex"'));
   assert.equal(await js('document.querySelector("#speech-model").value'),'bodhan-flex');
@@ -109,11 +125,11 @@ app.whenReady().then(async () => {
   assert.equal(await js('document.querySelector("#start-with-windows").checked'),true);
   await click('#start-with-windows');await save();assert.equal(store.getSettings().startWithWindows,false);
   await js('document.querySelector("#startup-heading").scrollIntoView({block:"start"})');await screenshot('windows-startup');
-  await click('.settings-page input[type="checkbox"]:not(#start-with-windows)');
+  await js(`[...document.querySelectorAll('.settings-page label')].find(label=>label.textContent.includes('Save audio recordings')).querySelector('input').click();void 0;`);
   await click('input[name=bar-design][value=cloud]');
   assert.equal(store.getSettings().barDesign,'owl','Appearance waits for Save settings');
   await save();assert.equal(store.getSettings().barDesign,'cloud');assert.equal(store.getSettings().retainAudio,false);
-  assert.ok(await js('document.querySelector(".privacy-settings").textContent.includes("window title")'));
+  assert.ok(await js('document.querySelector(".privacy-settings").textContent.includes("app category")'));
   assert.ok(await js('document.querySelector(".privacy-settings").textContent.includes("changed spelling candidates")'));
   await navigate('Text & style');await click('.settings-subnav button:nth-child(2)');
   assert.equal(await js('document.querySelector("#gemini-structured-formatting").disabled'),false);
@@ -143,8 +159,9 @@ app.whenReady().then(async () => {
   window.setSize(960,720);await js('document.querySelector("#punctuation-mode").closest("details").open=true;document.querySelector("#punctuation-mode").closest("details").scrollIntoView({block:"start"})');
   assert.ok(await js('document.querySelector(".main-content").scrollWidth<=document.querySelector(".main-content").clientWidth+1'));
   await screenshot('concise-punctuation');window.setSize(1180,880);
+  const learnedBefore=store.getSettings().autoLearnCorrections;
   await click('[data-style="professional"]');await click('.writing-learning input');await save('.style-page');
-  assert.equal(store.getSettings().writingStyle,'professional');assert.equal(store.getSettings().autoLearnCorrections,false);
+  assert.equal(store.getSettings().writingStyle,'professional');assert.equal(store.getSettings().autoLearnCorrections,!learnedBefore);
   assert.equal(await js('document.querySelector(".writing-learning").closest("details").open'),false);
   await screenshot('simplified-style');
   // Speech models are selected once and staged like every other preference.
@@ -175,8 +192,7 @@ app.whenReady().then(async () => {
   await choose('#installed-formatting-model','bonsai-2:2b');
   assert.equal(store.getSettings().localLlmModel,'llama3.2');await save();
   assert.equal(store.getSettings().localLlmModel,'bonsai-2:2b');assert.equal(store.getSettings().writingProvider,'local');
-  await waitFor(()=>js('!document.querySelector("#formatting-provider option[value=ai]").disabled'));
-  await choose('#formatting-provider','ai');await save();
+  assert.equal(await js('document.querySelector("#formatting-provider option[value=ai]").disabled'),true,'Ollama supports rewrites and meeting summaries; AI dictation cleanup uses Gemini');
   catalogue.formatting={online:true,models:[]};await click('.local-models [aria-label="Refresh models"]');
   await waitFor(()=>js('document.querySelector("#installed-formatting-model").disabled'));
   catalogue.formatting={online:false};await click('.local-models [aria-label="Refresh models"]');
@@ -222,6 +238,50 @@ app.whenReady().then(async () => {
   assert.equal(starts.length,startsBefore);
   await js(`document.querySelector('[aria-label="Spoken language"]').closest('.card').scrollIntoView({block:'start'})`);
   await screenshot('automatic-language-model');
+  // Downloaded Bark weights still require a compatible runtime before selection can commit.
+  catalogue.speech.models.push({id:'bark-pro',name:'Underdog Bark 3.0 Pro · English',engine:'parakeet-tdt',languages:['en'],downloaded:true,runtime_ready:false,bytes:1254196636});
+  await choose('[aria-label="Spoken language"]','en');
+  await waitFor(()=>js('!document.querySelector(".settings-basics > .card:nth-child(2) select").disabled'));
+  await save();
+  const beforeBark=store.getSettings().localSttModel;
+  await click('.local-models [aria-label="Refresh model status"]');
+  await choose('#speech-model','bark-pro');
+  assert.equal(store.getSettings().localSttModel,beforeBark);
+  assert.ok(await js('document.querySelector(".local-models").textContent.includes("vocabulary prompts are unavailable")'));
+  const clickSetup=()=>js(`[...document.querySelectorAll('.local-models button')].find(button=>button.textContent==='Set up model').click();void 0;`);
+  const barkStarts=starts.length;
+  await clickSetup();await waitFor(()=>starts.length===barkStarts+1);
+  assert.equal(starts.at(-1).model,'bark-pro');assert.equal(starts.at(-1).language,'en');
+  assert.equal(starts.at(-1).preset,'full-cpu');
+  setupState='failed';await click('.local-models [aria-label="Refresh model status"]');
+  assert.equal(store.getSettings().localSttModel,beforeBark);
+  await clickSetup();await waitFor(()=>starts.length===barkStarts+2);
+  catalogue.speech.models.find(model=>model.id==='bark-pro').runtime_ready=true;setupState='ready';
+  await click('.local-models [aria-label="Refresh model status"]');
+  await waitFor(()=>js('document.querySelector(".speech-overview h4").textContent.includes("Bark")'));
+  await save();assert.equal(store.getSettings().localSttModel,'bark-pro');
+  assert.equal(store.getSettings().dictationLanguage,'en');
+  await js('document.querySelector(".model-picker").open=true;document.querySelector(".model-picker").scrollIntoView({block:"center"})');
+  await screenshot('bark-model-settings');
+  // Setup has one visible progress panel even when Advanced local speech is expanded.
+  setupState='running';setupTelemetry={stage:'libraries',message:'Installing the speech recognition and model libraries…',startedAt:Date.now()-200000,stageStartedAt:Date.now()-120000,lastActivityAt:Date.now()-70000,activity:'Installing collected packages: transformers, librosa',log:['Collecting transformers','Installing collected packages: transformers, librosa']};
+  await click('.local-models [aria-label="Refresh model status"]');
+  await waitFor(()=>js('document.querySelector(".setup-progress")?.textContent.includes("No new installer output")'));
+  await js('document.querySelector(".local-setup").closest("details").open=true;void 0;');
+  assert.equal(await js('document.querySelectorAll(".setup-progress").length'),1);
+  assert.equal(await js('document.querySelectorAll("button").length>0&&[...document.querySelectorAll("button")].filter(b=>b.textContent==="Cancel setup").length'),1);
+  assert.ok(await js('document.querySelector(".setup-progress").textContent.includes("Elapsed 3m")'));
+  assert.ok(await js('document.querySelector(".setup-progress").textContent.includes("Remaining time is unavailable")'));
+  assert.equal(await js('document.querySelector(".setup-progress progress").hasAttribute("value")'),false);
+  await js('document.querySelector(".setup-progress details").open=true;document.querySelector(".setup-progress").scrollIntoView({block:"center"});void 0;');
+  await screenshot('setup-progress-installation');
+  setupTelemetry={...setupTelemetry,stage:'python',message:'Downloading Python…',lastActivityAt:Date.now(),received:10*1024**2,total:20*1024**2,progress:.5,transferStartedAt:Date.now()-10000};
+  await click('.local-models [aria-label="Refresh model status"]');
+  await waitFor(()=>js('document.querySelector(".setup-progress").textContent.includes("50% of this step")'));
+  assert.ok(await js('document.querySelector(".setup-progress").textContent.includes("MB/s")'));
+  assert.ok(await js('document.querySelector(".setup-progress").textContent.includes("left for this transfer")'));
+  await js('document.querySelector(".setup-progress button").click();void 0;');
+  await waitFor(()=>setupCancels===1);await waitFor(()=>js('document.querySelector(".setup-progress")?.textContent.includes("Setup cancelled")'));
   const config=fs.readFileSync(path.join(profile,'owlio_config.json'),'utf8');
   assert.ok(!config.includes('hf_synthetic'));assert.ok(!config.includes('synthetic-ui-secret'));assert.ok(!config.includes('synthetic-groq-secret'));
   assert.equal(new Store(profile).getSettings().localSttOutputMode,undefined);assert.deepEqual(errors,[]);

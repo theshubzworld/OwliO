@@ -21,7 +21,7 @@ export function LocalSpeechSettings({settings,currentModel,onChange,onConnected,
     const picker=document.querySelector<HTMLDetailsElement>('.models-page .model-picker');
     if(picker){picker.open=true;picker.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});picker.querySelector<HTMLSelectElement>('select')?.focus({preventScroll:true});}
   };
-  const setup=<LocalSetupPanel initialModel={settings.localSttModel} initialLanguage={settings.dictationLanguage} currentModel={currentModel} onConnected={onConnected} onManageModels={status.runtimeConfigured?manage:undefined} onOpenWizard={onOpenWizard}/>;
+  const setup=<LocalSetupPanel hideProgress={status.runtimeConfigured} initialModel={settings.localSttModel} initialLanguage={settings.dictationLanguage} currentModel={currentModel} onConnected={onConnected} onManageModels={status.runtimeConfigured?manage:undefined} onOpenWizard={onOpenWizard}/>;
   return status.runtimeConfigured?<>
     <LocalModels section="speech" settings={settings} onSettingsChange={onChange}/>
     <details className="settings-disclosure settings-advanced"><summary>Advanced local speech<span>Repair, storage and diagnostics</span></summary>{setup}</details>

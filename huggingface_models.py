@@ -1,4 +1,4 @@
-"""Import public Whisper repositories without executing repository code."""
+"""Import supported speech repositories without executing repository code."""
 import json
 import re
 from pathlib import Path
@@ -31,8 +31,8 @@ def inspect_repository(repo, cache_dir):
     siblings = {file.rfilename: file for file in info.siblings}
     if "model.bin" in siblings and config.get("model_type") in (None, "Whisper", "whisper"):
         engine, weights = "faster-whisper", ["model.bin"]
-    elif config.get("model_type") == "whisper":
-        engine = "transformers"
+    elif config.get("model_type") in ("whisper", "parakeet_tdt"):
+        engine = "parakeet-tdt" if config['model_type'] == 'parakeet_tdt' else "transformers"
         if "model.safetensors" in siblings:
             weights = ["model.safetensors"]
         elif "model.safetensors.index.json" in siblings:
@@ -43,17 +43,19 @@ def inspect_repository(repo, cache_dir):
                 raise ValueError("Invalid safetensors weight index.")
             weights.append("model.safetensors.index.json")
         else:
-            raise ValueError("This Whisper repository needs safetensors weights. Pick a safetensors version.")
+            raise ValueError("This speech repository needs safetensors weights. Pick a safetensors version.")
     else:
-        raise ValueError("Only Whisper speech recognition models are supported. This repository is not a compatible Whisper model.")
+        raise ValueError("Supported speech architectures: Whisper and Parakeet TDT (including Bark Pro). This repository is not compatible.")
     assets = [file for file in ("config.json", "generation_config.json", "tokenizer.json", "tokenizer_config.json",
-              "preprocessor_config.json", "special_tokens_map.json", "added_tokens.json", "normalizer.json",
-              "vocab.json", "merges.txt", "vocabulary.json", "vocabulary.txt") if file in siblings]
+              "preprocessor_config.json", "processor_config.json", "special_tokens_map.json", "added_tokens.json", "normalizer.json",
+              "vocab.json", "merges.txt", "vocabulary.json", "vocabulary.txt", "NOTICE", "LICENSE") if file in siblings]
     required = sorted(set(weights + assets + ["config.json"]))
     if any(file not in siblings for file in required):
         raise ValueError("The repository is missing a required weight file.")
     if not ("tokenizer.json" in siblings or ("vocab.json" in siblings and "merges.txt" in siblings)):
-        raise ValueError("This repository does not include the Whisper tokenizer.")
+        raise ValueError("This repository does not include a supported speech tokenizer.")
+    if engine == 'parakeet-tdt' and not {'processor_config.json', 'preprocessor_config.json'}.intersection(siblings):
+        raise ValueError('This Parakeet repository is missing its processor configuration.')
     card = getattr(info, 'card_data', None) or {}
     declared = card.get('language', []) if hasattr(card, 'get') else []
     if isinstance(declared, str):

@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Mic,
+  Laptop,
+  Cloud,
   Users,
   BarChart3,
   BookA,
@@ -36,6 +38,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { ShortcutSettings } from './ShortcutSettings';
+import { speechModelLabel } from '../shared/speechModels';
 import { PrivacySettings } from './PrivacySettings';
 import { AccountPrivacy, AdminDashboard } from './AccountPrivacy';
 import { accountAccessError } from '../shared/accountAccess';
@@ -747,7 +750,7 @@ export const DashboardApp: React.FC = () => {
   );
   const microphoneName = audioDevices.find(device => device.deviceId === settings.microphoneDeviceId)?.label || 'System default';
   const speechModelName = settings.provider === 'local'
-    ? settings.localSttModel === 'bodhan-flex' ? 'Bodhan Flex' : settings.localSttModel?.replace(/^hf:/, '') || 'Whisper base'
+    ? speechModelLabel(settings.localSttModel || 'base')
     : 'Groq';
   const outputScript = settings.romanizationProvider === 'gemini' && usesHindiConversion(settings.dictationLanguage) ? 'Roman Hinglish · Gemini'
     : 'Speech model’s original script';
@@ -1361,15 +1364,18 @@ export const DashboardApp: React.FC = () => {
             <DictationFlow settings={settings} />
             <div className="settings-basics">
             {/* AI Speech & Formatting Provider */}
-            <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Sparkles size={20} color="#76608C" />
-                <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Speech provider</h3>
+            <div className="card speech-choice-card">
+              <div className="speech-choice-heading">
+                <Laptop size={20} aria-hidden="true" />
+                <div><span className="settings-eyebrow">Recognition</span><h3>Where to process your voice</h3></div>
               </div>
-
-              <div style={{ marginTop: '12px' }}>
+              <p className="speech-choice-intro" id="speech-provider-help">Choose local processing or send audio to Groq.</p>
+              <div>
+                <label className="sr-only" htmlFor="speech-provider">Speech provider</label>
                 <select
+                  id="speech-provider"
                   aria-label="Dictation provider"
+                  aria-describedby="speech-provider-help speech-provider-detail"
                   className="select"
                   value={settings.provider}
                   onChange={event=>void chooseSpokenLanguage(settings.dictationLanguage,event.target.value)}
@@ -1378,23 +1384,27 @@ export const DashboardApp: React.FC = () => {
                   <option value="groq">Groq (cloud)</option>
                 </select>
               </div>
-              <p className="muted">{settings.provider === 'local' ? 'Speech recognition runs on your computer. Save connection changes before managing models.'  : 'Audio is sent to the selected cloud provider. Enter your API key and save to connect.'}</p>
+              <div className="speech-choice-summary" id="speech-provider-detail">
+                <span className={`speech-processing-badge ${settings.provider==='local'?'local':'cloud'}`}>{settings.provider==='local'?<Laptop size={14} aria-hidden="true"/>:<Cloud size={14} aria-hidden="true"/>}{settings.provider==='local'?'Audio stays on this computer':'Audio sent to Groq'}</span>
+                <p className="muted">{settings.provider==='local'?'Works offline after downloading a speech model.':'Requires internet and your Groq API key. Provider charges or limits may apply.'}</p>
+              </div>
 
               {settings.provider === 'local' && (
-                <details className="settings-disclosure settings-advanced" style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <summary>Advanced speech connection<span>Use an existing local speech server</span></summary>
+                <details className="settings-disclosure settings-advanced speech-connection">
+                  <summary>Connection settings<span>Only needed for a custom speech server</span></summary>
                   <div>
-                    <label style={{ fontSize: '13px', color: '#746F6B', display: 'block', marginBottom: '6px' }}>
+                    <label htmlFor="speech-server-address" style={{ fontSize: '13px', color: '#746F6B', display: 'block', marginBottom: '6px' }}>
                       Speech server address
                     </label>
                     <input
+                      id="speech-server-address"
                       type="text"
                       className="input"
                       value={settings.localSttUrl || 'http://localhost:8000/v1'}
                       onChange={(e) => setSettings({ ...settings, localSttUrl: e.target.value })}
                     />
                     <div style={{ fontSize: '11px', color: '#746F6B', marginTop: '4px' }}>
-                      Managed speech starts automatically. Use local setup below if it needs repair.
+                      Owlio starts managed speech automatically. Save address changes before managing models.
                     </div>
                   </div>
                 </details>
@@ -1402,10 +1412,12 @@ export const DashboardApp: React.FC = () => {
 
               {settings.provider === 'groq' && (
                 <div style={{ marginTop: '12px' }}>
-                  <label style={{ fontSize: '13px', color: '#746F6B', display: 'block', marginBottom: '6px' }}>
+                  <label htmlFor="groq-speech-key" style={{ fontSize: '13px', color: '#746F6B', display: 'block', marginBottom: '6px' }}>
                     Groq API Key
                   </label>
                   <input
+                    id="groq-speech-key"
+                    autoComplete="off"
                     type="password"
                     className="input"
                     placeholder="gsk_..."
@@ -1420,32 +1432,36 @@ export const DashboardApp: React.FC = () => {
             </div>
 
             {/* Dictation Languages */}
-            <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Globe size={20} color="#76608C" />
-                <h3 style={{ fontSize: '16px', fontWeight: 600 }}>What language do you speak?</h3>
+            <div className="card speech-choice-card">
+              <div className="speech-choice-heading">
+                <Globe size={20} aria-hidden="true" />
+                <div><span className="settings-eyebrow">Language</span><h3>What language do you speak?</h3></div>
               </div>
-              <p style={{ fontSize: '13px', color: '#746F6B', marginTop: '4px' }}>
-                Choose a language or detect it automatically. Speech stays in its original language and script. Use Hinglish for Hindi-English speech.
+              <p className="speech-choice-intro" id="spoken-language-help">
+                Choose your usual language, or let the model detect it.
               </p>
-
+              <label className="sr-only" htmlFor="spoken-language">Spoken language</label>
               <select
+                id="spoken-language"
                 aria-label="Spoken language"
+                aria-describedby="spoken-language-help spoken-language-detail"
                 className="select"
-                style={{ marginTop: '12px' }}
                 value={settings.dictationLanguage || 'hinglish'}
                 disabled={choosingLanguage}
                 onChange={event=>void chooseSpokenLanguage(event.target.value)}
               >
                 {SPEECH_LANGUAGES.filter(language=>providerSupportsLanguage(settings.provider,language.code)||language.code===settings.dictationLanguage).map(language=><option key={language.code} value={language.code} disabled={!providerSupportsLanguage(settings.provider,language.code)}>{language.name}</option>)}
               </select>
+              <div className="speech-language-shortcuts" role="group" aria-label="Common spoken languages">
+                {[['auto','Auto-detect'],['en','English'],['hi','Hindi'],['hinglish','Hinglish']].filter(([code])=>providerSupportsLanguage(settings.provider,code)).map(([code,label])=><button key={code} type="button" aria-pressed={settings.dictationLanguage===code} disabled={choosingLanguage} onClick={()=>void chooseSpokenLanguage(code)}>{label}</button>)}
+              </div>
               {!supportsSpeechLanguage(settings.provider,settings.localSttModel,settings.dictationLanguage)&&<p className="model-warning" role="alert">The selected speech model does not support this language. Choose a compatible model or another language before saving.</p>}
-              <p className="muted">{settings.provider==='local'?'Owlio keeps a model with documented support or selects a compatible downloaded model for this language. If one is needed, its download appears below.':'Recognition uses the selected cloud speech provider.'}</p>
+              <p className="muted speech-language-detail" id="spoken-language-detail">{settings.dictationLanguage==='hinglish'?'For Hindi and English mixed in the same sentence.':settings.dictationLanguage==='auto'?'Detection is limited to the languages supported by your speech model.':'A specific language helps guide recognition.'} {settings.provider==='local'?'Owlio checks for a compatible model below.':'Groq handles recognition.'}</p>
               {choosingLanguage&&<p role="status" className="muted">Checking compatible downloaded models…</p>}
               {!choosingLanguage&&languageModelNotice&&settings.provider==='local'&&<p role="status" className="settings-status" id="language-model-selection">{languageModelNotice}</p>}
             </div>
             </div>
-            <p className="settings-save-note"><strong>Save settings</strong> applies all pending settings. Downloads and repairs start when selected.</p>
+            <p className="settings-save-note"><strong>Save settings</strong> to apply your choices. Model downloads and setup start when you select them.</p>
             {settings.provider === 'local' && <LocalSpeechSettings settings={settings} currentModel={savedSettings?.localSttModel} onChange={patch=>{if(patch.localSttModel!==undefined)setLanguageModelNotice('');setSettings((previous:any)=>({...previous,...patch}));}} onConnected={syncSetupSettings} onOpenWizard={()=>{
               void(window as any).api.updateSettings({setupCompleted:false}).then(()=>setSettings((previous:any)=>({...previous,setupCompleted:false}))).catch((error:Error)=>setSaveError(error.message));
             }}/>}

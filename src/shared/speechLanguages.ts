@@ -116,6 +116,7 @@ export const SPEECH_LANGUAGE_CODES = SPEECH_LANGUAGES.map(item=>item.code);
 export function languageName(code:string):string {return SPEECH_LANGUAGES.find(item=>item.code===code)?.name || code;}
 export function documentedModelLanguages(model:string):string[]|null {
   const id=model.replace(/^hf:/,'').toLowerCase();
+  if(id==='bark-pro'||id==='conwayresearch/underdog-bark-3.0-pro')return ['en'];
   if(id==='bodhan-flex'||id==='bodhan-ai/indic-transcribe-flex')return [...FLEX_LANGUAGE_CODES];
   // Fine-tuning retains tokenizer tokens, but that does not establish trained coverage.
   // https://huggingface.co/Trelis/whisper-hinglish-preview
