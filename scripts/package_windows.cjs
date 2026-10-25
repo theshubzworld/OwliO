@@ -26,6 +26,8 @@ function run(command, args, cwd = root) {
   const helper = path.join(root, 'release-artifacts', 'helper-build');
   run('dotnet', ['publish', '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '-o', helper], path.join(root, 'windows-helper'));
   npm('build:renderer');
+  // Regenerate license notices so they match the bundled dependency versions.
+  npm('notices');
   // Reject private keys or extra fields before cloud config enters an installer.
   const cloudConfig=path.join(root,'cloud-config.json');
   if(!fs.existsSync(cloudConfig)) throw Error('The official app requires cloud-config.json for mandatory sign-in.');
