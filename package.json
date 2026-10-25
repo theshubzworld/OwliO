@@ -3,6 +3,14 @@
   "productName": "Owlio",
   "version": "1.0.24",
   "description": "Ultra-fast, context-aware AI voice dictation for Windows",
+  "homepage": "https://theshubzworld.github.io/OwliO/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theshubzworld/OwliO.git"
+  },
+  "bugs": {
+    "url": "https://github.com/theshubzworld/OwliO/issues"
+  },
   "main": "dist/main/main.js",
   "scripts": {
     "build:helper": "cd windows-helper && dotnet publish -c Release -r win-x64 --self-contained true -o bin/Release/net8.0-windows/publish",
@@ -16,7 +24,8 @@
     "pretest": "npm run build:main && tsc -p tsconfig.test.json",
     "test": "node --test tests/*.test.js",
     "package": "node scripts/package_windows.cjs",
-    "dev": "npm run build:helper && tsc -p tsconfig.main.json && vite build && electron dist/main/main.js"
+    "dev": "npm run build:helper && tsc -p tsconfig.main.json && vite build && electron dist/main/main.js",
+    "notices": "node scripts/generate_notices.cjs"
   },
   "keywords": [
     "dictation",
@@ -25,7 +34,7 @@
     "ai",
     "windows"
   ],
-  "author": "Owlio",
+  "author": "theshubzworld",
   "license": "MIT",
   "build": {
     "appId": "com.owlio.desktop",
@@ -44,6 +53,16 @@
       "package.json",
       "!tests/**",
       "!release-artifacts/**"
+    ],
+    "extraFiles": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "THIRD-PARTY-NOTICES.txt",
+        "to": "THIRD-PARTY-NOTICES.txt"
+      }
     ],
     "extraResources": [
       {
@@ -65,7 +84,8 @@
           "setup_runtime.py",
           "requirements*.txt",
           "vendor/**/*.py",
-          "vendor/**/*.md"
+          "vendor/**/*.md",
+          "vendor/**/*.txt"
         ]
       }
     ],
@@ -90,7 +110,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Owlio",
       "runAfterFinish": false
-    }
+    },
+    "copyright": "Copyright (c) 2026 theshubzworld and Owlio contributors"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.11",
