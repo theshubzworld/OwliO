@@ -53,7 +53,7 @@ import type { AccountStatus } from '../shared/cloud';
 import { LocalModels } from './LocalModels';
 import { AudioRecorder } from './audioRecorder';
 import { WritingMemory } from './WritingMemory';
-import { HistoryCorrection } from './HistoryCorrection';
+import { HistoryCorrection, canCorrect } from './HistoryCorrection';
 import { WritingSettings } from './WritingSettings';
 import { SPEECH_LANGUAGES, supportsSpeechLanguage, providerSupportsLanguage, selectSpeechModel, languageName, usesHindiConversion } from '../shared/speechLanguages';
 import { writingProvider } from '../shared/writingConfig';
@@ -226,6 +226,7 @@ export const DashboardApp: React.FC = () => {
   const [languageModelNotice,setLanguageModelNotice]=useState('');
   const languageSelection=useRef(0);
   const [savedSettings, setSavedSettings] = useState<any>(null);
+  const [correctingId, setCorrectingId] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [startupStatus, setStartupStatus] = useState<{supported:boolean;enabled:boolean;error?:string}|null>(null);
@@ -803,7 +804,7 @@ export const DashboardApp: React.FC = () => {
           <div className="brand-icon"><img src={owlioIcon} alt="" width={32} height={32} /></div>
           <div>
             <div className="brand-title">Owlio</div>
-            <div style={{ fontSize: '11px', color: 'var(--c-746f6b)' }}>Voice & Meeting AI</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--c-746f6b)' }}>Voice typing</div>
           </div>
         </div>
 
@@ -859,7 +860,7 @@ export const DashboardApp: React.FC = () => {
           <section className="dictation-page" aria-label="Dictation dashboard">
               <div className="header-row">
                 <div>
-                  <h1 className="page-title">Your voice workspace</h1>
+                  <h1 className="page-title">Home</h1>
                 </div>
               </div>
 
@@ -911,13 +912,12 @@ export const DashboardApp: React.FC = () => {
                         <span className="app-badge">{item.processName || 'Window'}</span>
                         {item.isInstruct && (
                           <span className="app-badge" style={{ background: 'rgba(168, 85, 247, 0.2)', color: 'var(--c-80559a)' }}>
-                            ✨ Instruct
+                            Rewrite
                           </span>
                         )}
                         <span>{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        {item.wpm && <span style={{ color: 'var(--c-396f68)' }}>{item.wpm} WPM</span>}
 
-                        <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
                           {item.deliveryStatus === 'failed' && item.audioUrl && <button className="btn btn-secondary" disabled={Boolean(recoveringId)} onClick={async () => {
                             setRecoveringId(item.id);
                             try { await (window as any).api.recoverDictation(item.id); setCopiedId(item.id); }
@@ -927,16 +927,17 @@ export const DashboardApp: React.FC = () => {
                           {item.audioUrl && (
                             <button
                               className="btn btn-secondary"
-                              style={{ padding: '4px 8px', fontSize: '12px' }}
+                              style={{ padding: '4px 8px', fontSize: 'var(--text-xs)' }}
                               onClick={() => handlePlayAudio(item.audioUrl, item.id)}
                             >
                               {playingId === item.id ? <Pause size={14} style={{ color: 'var(--c-396f68)' }} /> : <Play size={14} style={{ color: 'var(--c-76608c)' }} />}
                               <span>{playingId === item.id ? 'Pause' : 'Play Audio'}</span>
                             </button>
                           )}
+                          {canCorrect(item) && <button className="btn btn-secondary" aria-expanded={correctingId === item.id} onClick={() => setCorrectingId(correctingId === item.id ? '' : item.id)}><span>Correct</span></button>}
                           <button
                             className="btn btn-secondary"
-                            style={{ padding: '4px 8px', fontSize: '12px' }}
+                            style={{ padding: '4px 8px', fontSize: 'var(--text-xs)' }}
                             onClick={() => handleCopyHistory(item.editedText || item.formattedText, item.id)}
                           >
                             {copiedId === item.id ? <Check size={14} style={{ color: 'var(--c-36754c)' }} /> : <Copy size={14} />}
@@ -948,7 +949,7 @@ export const DashboardApp: React.FC = () => {
                       {item.deliveryStatus === 'processing' && <p className="muted" role="status">Processing recording…</p>}
                       <div className="history-text">{item.editedText || item.formattedText || 'No transcript yet. Use Transcribe again if audio is available.'}</div>
                       {item.editedText && <p className="muted">Corrected version · Original dictation is retained.</p>}
-                      <HistoryCorrection item={item}/>
+                      <HistoryCorrection item={item} open={correctingId === item.id} onOpenChange={open => setCorrectingId(open ? item.id : '')}/>
                       {item.warning && <p className="muted">{item.warning}</p>}
                     </div>
                   ))}</section>)
@@ -966,7 +967,7 @@ export const DashboardApp: React.FC = () => {
             <div className="header-row">
               <div>
                 <h1 className="page-title">Meeting Notetaker</h1>
-                <p style={{ color: 'var(--c-746f6b)', fontSize: '14px', marginTop: '4px' }}>
+                <p style={{ color: 'var(--c-746f6b)', fontSize: 'var(--text-md)', marginTop: '4px' }}>
                   Records your microphone for up to two hours. Voices heard only through headphones are not captured. Turn on recording retention to retry unfinished recordings.
                 </p>
               </div>
@@ -1020,17 +1021,17 @@ export const DashboardApp: React.FC = () => {
                   />
                   <div>
                     <h4 style={{ fontWeight: 600 }}>Meeting Recording in Progress</h4>
-                    <p style={{ fontSize: '13px', color: 'var(--c-746f6b)' }}>Capturing microphone audio · two-hour limit</p>
+                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)' }}>Capturing microphone audio · two-hour limit</p>
                   </div>
                 </div>
-                <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--c-ef4444)' }}>
+                <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, fontFamily: 'monospace', color: 'var(--c-ef4444)' }}>
                   {formatMeetingTime(meetingDuration)}
                 </div>
               </div>
             )}
 
             {isSummarizing && (
-              <div className="card" style={{ textAlign: 'center', padding: '30px' }}>
+              <div className="card" style={{ textAlign: 'center', padding: '32px' }}>
                 <p style={{ color: 'var(--c-76608c)' }}>Processing meeting audio and extracting action items...</p>
                 <button className="btn btn-secondary" onClick={() => void (window as any).api.cancelMeetingProcessing().catch((error: Error) => setMeetingError(error.message))}>Cancel processing</button>
               </div>
@@ -1040,9 +1041,9 @@ export const DashboardApp: React.FC = () => {
               <div className="card" style={{ borderColor: 'rgba(99, 102, 241, 0.3)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <FileText size={18} style={{ color: 'var(--c-76608c)' }} />
-                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Latest Meeting Summary</h3>
+                  <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Latest Meeting Summary</h3>
                 </div>
-                <p style={{ fontSize: '14px', lineHeight: 1.6, color: 'var(--c-292627)', marginTop: '8px' }}>
+                <p style={{ fontSize: 'var(--text-md)', lineHeight: 1.6, color: 'var(--c-292627)', marginTop: '8px' }}>
                   {currentMeetingSummary}
                 </p>
 
@@ -1050,11 +1051,11 @@ export const DashboardApp: React.FC = () => {
                   <div style={{ marginTop: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       <CheckSquare size={16} style={{ color: 'var(--c-36754c)' }} />
-                      <span style={{ fontSize: '14px', fontWeight: 600 }}>Action Items / Todos</span>
+                      <span style={{ fontSize: 'var(--text-md)', fontWeight: 600 }}>Action Items / Todos</span>
                     </div>
-                    <ul style={{ listStyleType: 'disc', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <ul style={{ listStyleType: 'disc', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {currentActionItems.map((action, i) => (
-                        <li key={i} style={{ fontSize: '13px', color: 'var(--c-514c4d)' }}>
+                        <li key={i} style={{ fontSize: 'var(--text-sm)', color: 'var(--c-514c4d)' }}>
                           {action}
                         </li>
                       ))}
@@ -1071,7 +1072,7 @@ export const DashboardApp: React.FC = () => {
                     <h4 style={{ fontWeight: 600 }}>{note.title}</h4>
                     <span className="app-badge">{formatMeetingTime(note.duration)}</span>
                   </div>
-                  <p style={{ fontSize: '13px', color: 'var(--c-746f6b)', marginTop: '6px' }}>{note.summary}</p>
+                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)', marginTop: '4px' }}>{note.summary}</p>
                   {note.warning && <p className="delivery-error">{note.warning}</p>}
                   <details><summary>Transcript</summary><p style={{whiteSpace:'pre-wrap'}}>{note.transcript}</p></details>
                 </div>
@@ -1086,7 +1087,7 @@ export const DashboardApp: React.FC = () => {
             <div className="header-row">
               <div>
                 <h1 className="page-title">Word book</h1>
-                <p style={{ color: 'var(--c-746f6b)', fontSize: '14px', marginTop: '4px' }}>
+                <p style={{ color: 'var(--c-746f6b)', fontSize: 'var(--text-md)', marginTop: '4px' }}>
                   Spellings Owlio should get right, and shortcuts it expands.
                 </p>
               </div>
@@ -1099,8 +1100,8 @@ export const DashboardApp: React.FC = () => {
 
             <WritingMemory view="vocabulary"/>
             <div className="card">
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Add word or replacement</h3>
-              <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+              <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Add word or replacement</h3>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                 <input
                   type="text"
                   className="input"
@@ -1134,7 +1135,7 @@ export const DashboardApp: React.FC = () => {
                     <span style={{ color: 'var(--c-746f6b)' }}>→</span>
                     <span style={{ color: 'var(--c-76608c)', fontWeight: 600, fontFamily: 'monospace' }}>"{item.to}"</span>
                   </div>
-                  <button className="btn btn-secondary" style={{ padding: '6px' }} onClick={() => handleDeleteDictionaryItem(item.id)}>
+                  <button className="btn btn-secondary" style={{ padding: '4px' }} onClick={() => handleDeleteDictionaryItem(item.id)}>
                     <Trash2 size={14} style={{ color: 'var(--c-b14848)' }} />
                   </button>
                 </div>
@@ -1149,15 +1150,15 @@ export const DashboardApp: React.FC = () => {
             <div className="header-row">
               <div>
                 <h2 className="section-title">Shortcuts</h2>
-                <p style={{ color: 'var(--c-746f6b)', fontSize: '14px', marginTop: '4px' }}>
+                <p style={{ color: 'var(--c-746f6b)', fontSize: 'var(--text-md)', marginTop: '4px' }}>
                   Say a trigger phrase and Owlio types the full text.
                 </p>
               </div>
             </div>
 
             <div className="card">
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Add shortcut</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
+              <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Add shortcut</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
                 <input
                   type="text"
                   className="input"
@@ -1175,30 +1176,30 @@ export const DashboardApp: React.FC = () => {
               </div>
               <textarea
                 className="input"
-                style={{ marginTop: '10px', height: '80px', resize: 'vertical' }}
+                style={{ marginTop: '8px', height: '80px', resize: 'vertical' }}
                 placeholder="Expanded template text..."
                 value={newSnippetText}
                 onChange={(e) => setNewSnippetText(e.target.value)}
               />
-              <button className="btn btn-primary" style={{ marginTop: '10px' }} onClick={handleAddSnippet}>
+              <button className="btn btn-primary" style={{ marginTop: '8px' }} onClick={handleAddSnippet}>
                 <Plus size={16} />
                 <span>Add shortcut</span>
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {snippets.map((snip) => (
                 <div key={snip.id} className="card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span className="app-badge" style={{ fontFamily: 'monospace' }}>{snip.trigger}</span>
-                      <span style={{ fontSize: '13px', color: 'var(--c-746f6b)' }}>{snip.description}</span>
+                      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)' }}>{snip.description}</span>
                     </div>
-                    <button className="btn btn-secondary" style={{ padding: '6px' }} onClick={() => handleDeleteSnippet(snip.id)}>
+                    <button className="btn btn-secondary" style={{ padding: '4px' }} onClick={() => handleDeleteSnippet(snip.id)}>
                       <Trash2 size={14} style={{ color: 'var(--c-b14848)' }} />
                     </button>
                   </div>
-                  <div style={{ marginTop: '8px', fontSize: '14px', color: 'var(--c-292627)', whiteSpace: 'pre-wrap' }}>
+                  <div style={{ marginTop: '8px', fontSize: 'var(--text-md)', color: 'var(--c-292627)', whiteSpace: 'pre-wrap' }}>
                     {snip.replacement}
                   </div>
                 </div>
@@ -1213,7 +1214,7 @@ export const DashboardApp: React.FC = () => {
             <div className="header-row">
               <div>
                 <h1 className="page-title">Writing style</h1>
-                <p style={{ color: 'var(--c-746f6b)', fontSize: '14px', marginTop: '4px' }}>
+                <p style={{ color: 'var(--c-746f6b)', fontSize: 'var(--text-md)', marginTop: '4px' }}>
                   Your writing tone, smart lists, punctuation and personal rules.
                 </p>
               </div>
@@ -1305,7 +1306,7 @@ export const DashboardApp: React.FC = () => {
                 <details className="settings-disclosure settings-advanced speech-connection">
                   <summary>Connection settings<span>Only needed for a custom speech server</span></summary>
                   <div>
-                    <label htmlFor="speech-server-address" style={{ fontSize: '13px', color: 'var(--c-746f6b)', display: 'block', marginBottom: '6px' }}>
+                    <label htmlFor="speech-server-address" style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)', display: 'block', marginBottom: '4px' }}>
                       Speech server address
                     </label>
                     <input
@@ -1315,7 +1316,7 @@ export const DashboardApp: React.FC = () => {
                       value={settings.localSttUrl || 'http://localhost:8000/v1'}
                       onChange={(e) => setSettings({ ...settings, localSttUrl: e.target.value })}
                     />
-                    <div style={{ fontSize: '11px', color: 'var(--c-746f6b)', marginTop: '4px' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--c-746f6b)', marginTop: '4px' }}>
                       Owlio starts managed speech automatically. Save address changes before managing models.
                     </div>
                   </div>
@@ -1324,7 +1325,7 @@ export const DashboardApp: React.FC = () => {
 
               {settings.provider === 'groq' && (
                 <div style={{ marginTop: '12px' }}>
-                  <label htmlFor="groq-speech-key" style={{ fontSize: '13px', color: 'var(--c-746f6b)', display: 'block', marginBottom: '6px' }}>
+                  <label htmlFor="groq-speech-key" style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)', display: 'block', marginBottom: '4px' }}>
                     Groq API Key
                   </label>
                   <input
@@ -1395,7 +1396,7 @@ export const DashboardApp: React.FC = () => {
             <div className="header-row"><div><h1 className="page-title">Shortcut and more</h1><p className="page-description">Your shortcut, microphone, floating bar and recordings.</p></div>{saveButton('general')}</div>
             <p className="settings-save-note"><strong>Save settings</strong> applies all pending settings.</p>
             <section className="card" aria-labelledby="startup-heading">
-              <h3 id="startup-heading" style={{ fontSize: '16px', fontWeight: 600 }}>Startup</h3>
+              <h3 id="startup-heading" style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Startup</h3>
               <label className="structure-toggle" htmlFor="start-with-windows">
                 <input id="start-with-windows" type="checkbox" checked={settings.startWithWindows === true} disabled={!startupStatus?.supported || !!startupStatus.error} onChange={event => setSettings((previous:any) => ({...previous,startWithWindows:event.target.checked}))} aria-describedby="startup-description"/>
                 Start Owlio when I sign in to Windows
@@ -1404,15 +1405,15 @@ export const DashboardApp: React.FC = () => {
             </section>
             {/* Microphone Selection & Comprehensive Quality Diagnostic Suite */}
             <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Volume2 size={20} style={{ color: 'var(--c-396f68)' }} />
-                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Your microphone</h3>
+                  <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Your microphone</h3>
                 </div>
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '12px', height: '28px' }}
+                  style={{ padding: '4px 8px', fontSize: 'var(--text-xs)', height: '28px' }}
                   onClick={() => void loadAudioDevices(true)}
                   title="Rescan connected audio devices"
                 >
@@ -1420,12 +1421,12 @@ export const DashboardApp: React.FC = () => {
                   <span>Rescan mics</span>
                 </button>
               </div>
-              <p style={{ fontSize: '13px', color: 'var(--c-746f6b)', marginTop: '4px' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)', marginTop: '4px' }}>
                 Use the Windows default or choose a microphone. Run a live level test or record a sample to inspect audio quality.
               </p>
 
               {/* Device Dropdown & Primary Test Action */}
-              <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
                 <select
                   aria-label="Your microphone"
                   className="select"
@@ -1481,15 +1482,15 @@ export const DashboardApp: React.FC = () => {
 
               {/* Live VU Meter with Peak Hold & Decay */}
               {isTestingMic && (
-                <div style={{ marginTop: '14px', padding: '14px', background: 'var(--c-edeae3)', borderRadius: '10px', border: '1px solid var(--c-dfd9cf)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--c-65535b)', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ marginTop: '12px', padding: '12px', background: 'var(--c-edeae3)', borderRadius: '10px', border: '1px solid var(--c-dfd9cf)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-xs)', color: 'var(--c-65535b)', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Radio size={14} style={{ color: micTestVolume > 0.1 ? 'var(--c-2e7d32)' : 'var(--c-746f6b)' }} />
                       <strong style={{ fontWeight: 600 }}>Live Input Signal:</strong>
                       <span>{Math.round(micTestVolume * 100)}% Volume</span>
                       {micTestDb > -90 && <span style={{ color: 'var(--c-8a827d)' }}>({micTestDb} dBFS)</span>}
                     </div>
-                    <div style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ color: 'var(--c-8a827d)' }}>Peak:</span>
                       <strong style={{ color: micPeakVolume > 0.85 ? 'var(--c-dc2626)' : micPeakVolume > 0.2 ? 'var(--c-2e7d32)' : 'var(--c-8a827d)' }}>
                         {Math.round(micPeakVolume * 100)}%
@@ -1524,21 +1525,21 @@ export const DashboardApp: React.FC = () => {
                   </div>
 
                   {/* Live Feedback Status */}
-                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-xs)' }}>
                     {micTestVolume < 0.03 ? (
-                      <span style={{ color: 'var(--c-9e9a95)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ color: 'var(--c-9e9a95)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <VolumeX size={14} /> Silent / No signal — speak or check if your microphone is unmuted.
                       </span>
                     ) : micTestVolume < 0.2 ? (
-                      <span style={{ color: 'var(--c-b45309)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ color: 'var(--c-b45309)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <AlertTriangle size={14} /> Low volume — speak closer to the mic or raise Windows input volume.
                       </span>
                     ) : micTestVolume <= 0.85 ? (
-                      <span style={{ color: 'var(--c-2e7d32)', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500 }}>
+                      <span style={{ color: 'var(--c-2e7d32)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
                         <CheckCircle2 size={14} /> Clear speech level (Optimal for Whisper).
                       </span>
                     ) : (
-                      <span style={{ color: 'var(--c-dc2626)', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500 }}>
+                      <span style={{ color: 'var(--c-dc2626)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
                         <AlertTriangle size={14} /> Very loud — watch out for clipping / audio distortion.
                       </span>
                     )}
@@ -1548,19 +1549,19 @@ export const DashboardApp: React.FC = () => {
 
               {/* Quality Sample Recording in Progress */}
               {isRecordingQualitySample && (
-                <div style={{ marginTop: '14px', padding: '16px', background: 'var(--c-fbf0ee)', border: '1px solid var(--c-f5c6cb)', borderRadius: '10px', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', color: 'var(--c-9b2c2c)', fontWeight: 600 }}>
+                <div style={{ marginTop: '12px', padding: '16px', background: 'var(--c-fbf0ee)', border: '1px solid var(--c-f5c6cb)', borderRadius: '10px', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--c-9b2c2c)', fontWeight: 600 }}>
                     <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--c-e53e3e)', animation: 'pulse 1s infinite' }} />
                     <span>Speak naturally: testing voice clarity &amp; noise floor ({qualityCountdown}s remaining)...</span>
                   </div>
-                  <p style={{ fontSize: '12px', color: 'var(--c-746f6b)', marginTop: '6px' }}>Say a normal test sentence like "Owlio dictation is working nicely on my Windows PC."</p>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--c-746f6b)', marginTop: '4px' }}>Say a normal test sentence like "Owlio dictation is working nicely on my Windows PC."</p>
                 </div>
               )}
 
               {/* Quality Analysis & Audio Playback Box */}
               {!isRecordingQualitySample && qualitySampleUrl && qualityMetrics && (
-                <div style={{ marginTop: '14px', padding: '16px', background: 'var(--c-f8f6f2)', border: '1px solid var(--c-e5dfd5)', borderRadius: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ marginTop: '12px', padding: '16px', background: 'var(--c-f8f6f2)', border: '1px solid var(--c-e5dfd5)', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {qualityMetrics.status === 'optimal' ? (
                         <CheckCircle2 size={20} style={{ color: 'var(--c-2e7d32)' }} />
@@ -1570,10 +1571,10 @@ export const DashboardApp: React.FC = () => {
                         <AlertTriangle size={20} style={{ color: 'var(--c-d97706)' }} />
                       )}
                       <div>
-                        <strong style={{ fontSize: '14px', color: qualityMetrics.status === 'optimal' ? 'var(--c-2e7d32)' : qualityMetrics.status === 'silent' ? 'var(--c-dc2626)' : 'var(--c-b45309)' }}>
+                        <strong style={{ fontSize: 'var(--text-md)', color: qualityMetrics.status === 'optimal' ? 'var(--c-2e7d32)' : qualityMetrics.status === 'silent' ? 'var(--c-dc2626)' : 'var(--c-b45309)' }}>
                           {qualityMetrics.verdict}
                         </strong>
-                        <div style={{ fontSize: '12px', color: 'var(--c-746f6b)' }}>5-second test recording analyzed</div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--c-746f6b)' }}>5-second test recording analyzed</div>
                       </div>
                     </div>
 
@@ -1582,7 +1583,7 @@ export const DashboardApp: React.FC = () => {
                       type="button"
                       className={`btn ${qualityIsPlaying ? 'btn-danger' : 'btn-secondary'}`}
                       onClick={handleToggleQualityPlayback}
-                      style={{ padding: '6px 14px', fontSize: '13px' }}
+                      style={{ padding: '4px 12px', fontSize: 'var(--text-sm)' }}
                     >
                       {qualityIsPlaying ? <Pause size={15} /> : <Play size={15} />}
                       <span>{qualityIsPlaying ? 'Stop listening' : 'Listen to recording'}</span>
@@ -1590,28 +1591,28 @@ export const DashboardApp: React.FC = () => {
                   </div>
 
                   {/* Metrics Badges */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginTop: '14px' }}>
-                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '8px', border: '1px solid var(--c-ebe5dc)' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--c-8a827d)', display: 'block' }}>Peak Level</span>
-                      <strong style={{ fontSize: '13px', color: qualityMetrics.peakDb > -6 ? 'var(--c-dc2626)' : qualityMetrics.peakDb > -24 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginTop: '12px' }}>
+                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '6px', border: '1px solid var(--c-ebe5dc)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)', display: 'block' }}>Peak Level</span>
+                      <strong style={{ fontSize: 'var(--text-sm)', color: qualityMetrics.peakDb > -6 ? 'var(--c-dc2626)' : qualityMetrics.peakDb > -24 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
                         {qualityMetrics.peakDb} dBFS
                       </strong>
                     </div>
-                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '8px', border: '1px solid var(--c-ebe5dc)' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--c-8a827d)', display: 'block' }}>Speech Volume</span>
-                      <strong style={{ fontSize: '13px', color: qualityMetrics.speechRmsDb > -30 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
+                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '6px', border: '1px solid var(--c-ebe5dc)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)', display: 'block' }}>Speech Volume</span>
+                      <strong style={{ fontSize: 'var(--text-sm)', color: qualityMetrics.speechRmsDb > -30 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
                         {qualityMetrics.speechRmsDb} dBFS
                       </strong>
                     </div>
-                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '8px', border: '1px solid var(--c-ebe5dc)' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--c-8a827d)', display: 'block' }}>Noise Floor</span>
-                      <strong style={{ fontSize: '13px', color: qualityMetrics.noiseFloorDb < -35 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
+                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '6px', border: '1px solid var(--c-ebe5dc)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)', display: 'block' }}>Noise Floor</span>
+                      <strong style={{ fontSize: 'var(--text-sm)', color: qualityMetrics.noiseFloorDb < -35 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
                         {qualityMetrics.noiseFloorDb} dBFS
                       </strong>
                     </div>
-                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '8px', border: '1px solid var(--c-ebe5dc)' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--c-8a827d)', display: 'block' }}>Signal-to-Noise</span>
-                      <strong style={{ fontSize: '13px', color: qualityMetrics.snr > 15 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
+                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '6px', border: '1px solid var(--c-ebe5dc)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)', display: 'block' }}>Signal-to-Noise</span>
+                      <strong style={{ fontSize: 'var(--text-sm)', color: qualityMetrics.snr > 15 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
                         ~{qualityMetrics.snr} dB
                       </strong>
                     </div>
@@ -1619,7 +1620,7 @@ export const DashboardApp: React.FC = () => {
 
                   {/* Recommendations */}
                   {qualityMetrics.recommendations.length > 0 && (
-                    <div style={{ marginTop: '12px', padding: '10px 12px', background: 'var(--c-ffffff)', borderRadius: '8px', border: '1px solid var(--c-ebe5dc)', fontSize: '12px', color: 'var(--c-574f4a)' }}>
+                    <div style={{ marginTop: '12px', padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '6px', border: '1px solid var(--c-ebe5dc)', fontSize: 'var(--text-xs)', color: 'var(--c-574f4a)' }}>
                       <strong style={{ display: 'block', marginBottom: '4px', color: 'var(--c-413833)' }}>Recommendations:</strong>
                       <ul style={{ paddingLeft: '18px', margin: 0 }}>
                         {qualityMetrics.recommendations.map((rec, i) => (
@@ -1632,13 +1633,13 @@ export const DashboardApp: React.FC = () => {
               )}
 
               {/* Hardware DSP Processing Controls */}
-              <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--c-e8e3da)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                  <strong style={{ fontSize: '12px', color: 'var(--c-5b5357)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Audio Processing Enhancements</strong>
-                  <span style={{ fontSize: '11px', color: 'var(--c-8a827d)' }}>Applies to both dictation &amp; tests</span>
+              <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--c-e8e3da)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+                  <strong style={{ fontSize: 'var(--text-xs)', color: 'var(--c-5b5357)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Audio Processing Enhancements</strong>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)' }}>Applies to both dictation &amp; tests</span>
                 </div>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={micNoiseSuppression}
@@ -1649,7 +1650,7 @@ export const DashboardApp: React.FC = () => {
                     />
                     Noise suppression
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={micAutoGainControl}
@@ -1660,7 +1661,7 @@ export const DashboardApp: React.FC = () => {
                     />
                     Auto gain control (AGC)
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={micEchoCancellation}
@@ -1672,7 +1673,7 @@ export const DashboardApp: React.FC = () => {
                     Echo cancellation
                   </label>
                 </div>
-                <p style={{ fontSize: '11px', color: 'var(--c-8a827d)', marginTop: '6px' }}>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)', marginTop: '4px' }}>
                   Tip: If using an external USB audio interface (like USB-UAC AP) or studio condenser mic, turning off Auto Gain Control often provides cleaner, more natural sound.
                 </p>
               </div>
@@ -1685,12 +1686,12 @@ export const DashboardApp: React.FC = () => {
             <AppearanceSettings design={settings.barDesign} onSaved={barDesign => setSettings((previous:any)=>({...previous,barDesign}))} />
 
             <div className="card">
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Recording history</h3>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+              <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Recording history</h3>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-md)' }}>
                 <input type="checkbox" checked={settings.retainAudio !== false} onChange={(e) => setSettings({ ...settings, retainAudio: e.target.checked })} />
                 Save audio recordings
               </label>
-              <p style={{ fontSize: '12px', color: 'var(--c-746f6b)', marginTop: '6px' }}>Keep recordings for 7 days for playback on Home, then delete them. Turn off to keep transcripts only.</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--c-746f6b)', marginTop: '4px' }}>Keep recordings for 7 days for playback on Home, then delete them. Turn off to keep transcripts only.</p>
             </div>
             <PrivacySettings/>
           </section>
