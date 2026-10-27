@@ -8,7 +8,7 @@ Windows dictation with an Electron/React dashboard and a .NET 8 helper for globa
 
 ## Windows installer
 
-`release-artifacts/1.0.26/Owlio-Setup-1.0.26.exe` installs the x64 desktop app with Owlio taskbar/tray icons and desktop/Start menu shortcuts. The installed executable is normally `%LOCALAPPDATA%\Programs\Owlio\Owlio.exe`. Packaging creates the installer without running it or updating an existing installation.
+`release-artifacts/1.0.27/Owlio-Setup-1.0.27.exe` installs the x64 desktop app with Owlio taskbar/tray icons and desktop/Start menu shortcuts. The installed executable is normally `%LOCALAPPDATA%\Programs\Owlio\Owlio.exe`. Packaging creates the installer without running it or updating an existing installation.
 
 The installed app saves data under `%APPDATA%\Owlio`. First launch copies the existing development profile's settings, dictionary, snippets, history, recordings and Windows-protected credential key without deleting the source profile. Existing installed profiles are retained. Reopening Owlio brings the existing app forward instead of running a second shortcut helper.
 
