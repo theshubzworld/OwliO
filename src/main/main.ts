@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, clipboard, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, clipboard, dialog, nativeTheme } from 'electron';
 import path from 'path';
 import { helperBridge } from './helperBridge';
 import { processAudioDictation, transcribeAudio, summarizeMeeting, WindowContext, DictationResult } from './aiService';
@@ -224,7 +224,7 @@ function createDashboardWindow(tab?: 'settings' | 'notetaker' | 'dictation' | 'a
     show: !minimized,
     icon: windowIconPath,
     title: 'Owlio - AI Voice Dictation & Notes',
-    backgroundColor: '#F5F3EE',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#16131A' : '#F5F3EE',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
@@ -367,6 +367,8 @@ function setupHelperListeners() {
 
 app.whenReady().then(() => {
   if (!ownsInstance) return;
+  nativeTheme.themeSource = store.getSettings().theme;
+  try { store.pruneExpiredAudio(); } catch (error) { console.warn('Could not remove expired recordings:', error); }
   startCloudServices(()=>{
     finishSession({state:'idle'});helperBridge.cancelPaste();meetingProcessing?.abort();dictationRecovery?.abort();
     if(activeMeetingCapture){const id=activeMeetingCapture;activeMeetingCapture=undefined;void meetingCaptures.failed(id).catch(()=>{});}
@@ -714,6 +716,8 @@ app.whenReady().then(() => {
       helperBridge.updateHotkey(updated.hotkey, updated.mode);
     }
     notifyPill({ hotkey: updated.hotkey, mode: updated.mode, microphoneDeviceId: updated.microphoneDeviceId, barDesign: updated.barDesign });
+    // The dashboard follows prefers-color-scheme, which nativeTheme drives (also the Windows title bar).
+    nativeTheme.themeSource = updated.theme;
     if (updated.autoLearnCorrections === false) { learningTargets.clear(); helperBridge.cancelLearning(); }
     return startupError ? { ...updated, startupError } : updated;
   });

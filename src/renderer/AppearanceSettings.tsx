@@ -8,7 +8,7 @@ export function AppearanceSettings({ design, onSaved }: { design: BarDesign; onS
   const selected = normalizeBarDesign(design);
   const choose = (next: BarDesign) => { if(next!==selected) onSaved(next); };
   return <section className="card appearance-settings" aria-labelledby="appearance-heading">
-    <div className="shortcut-heading"><Palette size={20} color="#76608C" /><h3 id="appearance-heading">Appearance</h3></div>
+    <div className="shortcut-heading"><Palette size={20} style={{ color: 'var(--c-76608c)' }} /><h3 id="appearance-heading">Appearance</h3></div>
     <p className="muted">Choose a floating bar design. Hover or focus to preview it.</p>
     <div className="appearance-options" role="group" aria-label="Bar design">
       {BAR_DESIGNS.map(item => <label key={item.id} className={`appearance-option${selected === item.id ? ' selected' : ''}`}

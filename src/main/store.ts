@@ -41,6 +41,8 @@ export interface AppSettings {
   dictationLanguage: string; // Whisper language code, Hinglish, or automatic detection
   retainAudio: boolean;
   startWithWindows: boolean;
+  theme: 'system' | 'light' | 'dark';
+  meetingNotesEnabled: boolean;
 }
 
 export interface DictionaryItem {
@@ -130,6 +132,8 @@ const DEFAULT_DATA: AppData = {
     dictationLanguage: 'en',
     retainAudio: true,
     startWithWindows: false,
+    theme: 'system',
+    meetingNotesEnabled: false,
   },
   dictionary: [
     { id: '1', from: 'whisper', to: 'Whisper' },
@@ -147,6 +151,8 @@ const DEFAULT_DATA: AppData = {
   history: [],
   meetings: [],
 };
+
+export const AUDIO_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class Store {
   private filePath: string;
@@ -168,6 +174,8 @@ export class Store {
       const previous = record(raw.settings);
       const retiredSpeech = previous.provider === 'openai' || previous.provider === 'mock';
       if (retiredSpeech) settings.provider = 'local';
+      // Labs: people who already saved meeting notes keep the feature switched on.
+      if (previous.meetingNotesEnabled === undefined && Array.isArray(raw.meetings) && raw.meetings.length > 0) settings.meetingNotesEnabled = true;
       if (previous.writingProvider === undefined || ['groq','openai'].includes(String(previous.writingProvider))) {
         settings.writingProvider = previous.formattingProvider === 'gemini' || previous.geminiApiKey ? 'gemini' : previous.provider === 'local' && previous.formattingProvider === 'auto' ? 'local' : 'off';
       }
@@ -310,9 +318,12 @@ export class Store {
     return fs.readFileSync(path.join(this.audioDir, item.audioFile));
   }
 
+  // Recordings are kept for seven days, then deleted; the transcript stays in history.
+  public pruneExpiredAudio(): void { this.pruneAudio(this.data.history); }
   private pruneAudio(history: HistoryItem[]): void {
     if (!fs.existsSync(this.audioDir)) return;
-    const keep = new Set(history.map((item) => item.audioFile));
+    const cutoff = Date.now() - AUDIO_RETENTION_MS;
+    const keep = new Set(history.filter((item) => item.timestamp >= cutoff).map((item) => item.audioFile));
     for (const file of fs.readdirSync(this.audioDir)) {
       if (/^[a-f0-9-]+\.wav$/.test(file) && !keep.has(file)) fs.unlinkSync(path.join(this.audioDir, file));
     }

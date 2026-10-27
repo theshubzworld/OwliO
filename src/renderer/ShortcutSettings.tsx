@@ -53,7 +53,7 @@ export function ShortcutSettings({ shortcut, mode, onShortcutChange, onModeChang
 
   return (
     <div className="card shortcut-card">
-      <div className="shortcut-heading"><Key size={20} color="#76608C" /><h3>Start and stop dictation</h3></div>
+      <div className="shortcut-heading"><Key size={20} style={{ color: 'var(--c-76608c)' }} /><h3>Start and stop dictation</h3></div>
       <p className="shortcut-description">Choose a shortcut and how it works.</p>
       <div className="shortcut-fields">
         <div>

@@ -98,7 +98,7 @@ export function LocalSetupPanel({onConnected,firstRun=false,onFinish,onOpenWizar
   const free=(bytes?:number)=>bytes===undefined?'Drive space unavailable':`${(bytes/1024**3).toFixed(1)} GB free`;
   const differentModels=!!status?.connectedModels&&!!status.storage&&status.connectedModels.toLowerCase()!==status.storage.models.toLowerCase();
   return <section className={`card local-setup${firstRun?' first-run-local':''}`} aria-labelledby="local-setup-heading">
-    <div className="shortcut-heading"><Download size={20} color="#76608C"/><h3 id="local-setup-heading">{configured?'Installed speech package':'Set up local speech'}</h3></div>
+    <div className="shortcut-heading"><Download size={20} style={{ color: 'var(--c-76608c)' }}/><h3 id="local-setup-heading">{configured?'Installed speech package':'Set up local speech'}</h3></div>
     {!status?<p className="muted" role="status">Checking your local speech setup…</p>:configured?<>
       <div className="setup-installed" aria-label="Connected speech setup">
         <p className="setup-connected"><Check size={15}/>{status.managed?'Managed by Owlio':'Manually connected runtime'}</p>

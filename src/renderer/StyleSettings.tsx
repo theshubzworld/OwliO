@@ -13,10 +13,6 @@ export function StyleSettings({settings,onChange,onOpenSettings}:{settings:AppSe
   const ai=provider!=='basic'&&settings.writingProvider!=='off';
   const gemini=ai&&settings.writingProvider==='gemini';
   return <>
-    <div className="style-intro">
-      <div><span className="settings-eyebrow">Your words, your way</span><h2>Choose how your dictations read</h2><p>Set your tone, organize lists, and fine-tune punctuation. Your language and meaning stay the same.</p></div>
-      <span className="style-provider">{ai?'Writing AI':'Basic punctuation'}</span>
-    </div>
     {!ai && <div className="style-provider-note"><p>Basic punctuation can adjust capitalization and sentence endings. Tone, custom writing rules and smart lists need AI cleanup.</p><button type="button" className="btn btn-secondary" onClick={onOpenSettings}>Set up AI cleanup</button></div>}
     <section className="card" aria-labelledby="tone-heading">
       <h3 id="tone-heading">Writing tone</h3>

@@ -36,6 +36,13 @@ import {
   Volume1,
   AlertTriangle,
   CheckCircle2,
+  ArrowRight,
+  ArrowLeft,
+  Home,
+  FlaskConical,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import { ShortcutSettings } from './ShortcutSettings';
 import { speechModelLabel } from '../shared/speechModels';
@@ -46,7 +53,7 @@ import type { AccountStatus } from '../shared/cloud';
 import { LocalModels } from './LocalModels';
 import { AudioRecorder } from './audioRecorder';
 import { WritingMemory } from './WritingMemory';
-import { HistoryCorrection } from './HistoryCorrection';
+import { HistoryCorrection, canCorrect } from './HistoryCorrection';
 import { WritingSettings } from './WritingSettings';
 import { SPEECH_LANGUAGES, supportsSpeechLanguage, providerSupportsLanguage, selectSpeechModel, languageName, usesHindiConversion } from '../shared/speechLanguages';
 import { writingProvider } from '../shared/writingConfig';
@@ -55,9 +62,22 @@ import { AppearanceSettings } from './AppearanceSettings';
 import { DictationFlow } from './DictationFlow';
 import { LocalSpeechSettings } from './LocalSpeechSettings';
 import { FirstRunSetup, LocalSetupPanel } from './LocalSetup';
+import { OwlAvatar } from './OwlAvatar';
+import { BAR_DESIGNS } from '../shared/barDesigns';
 import owlioIcon from '../../assets/brand/owlio-icon.png';
 
-type DashboardTab = 'dictation' | 'notetaker' | 'insights' | 'dictionary' | 'snippets' | 'style' | 'scratchpad' | 'settings' | 'models' | 'text' | 'account' | 'admin';
+type DashboardTab = 'dictation' | 'words' | 'setup' | 'labs' | 'notetaker' | 'style' | 'settings' | 'models' | 'text' | 'account' | 'admin';
+const SETUP_PAGES: DashboardTab[] = ['models', 'text', 'style', 'settings', 'account', 'admin'];
+// Setup steps run in this order; each can also be opened directly.
+const SETUP_STEPS: { tab: DashboardTab; label: string; hint: string; section?: SettingsSection }[] = [
+  { tab: 'models', label: 'Speech', hint: 'Model and where it runs', section: 'speech' },
+  { tab: 'text', label: 'Text', hint: 'Cleanup and script', section: 'text' },
+  { tab: 'style', label: 'Style', hint: 'Tone and rules', section: 'style' },
+  { tab: 'settings', label: 'Shortcut', hint: 'Key, microphone and more', section: 'general' },
+  { tab: 'account', label: 'Account', hint: 'Guest or sign in' },
+];
+// Older links and tray actions may still name the retired pages.
+const TAB_ALIASES: Record<string, DashboardTab> = { dictionary: 'words', snippets: 'words', insights: 'dictation', scratchpad: 'dictation' };
 type SettingsSection = 'speech' | 'text' | 'general' | 'style';
 const SETTINGS_FIELDS: Record<SettingsSection, string[]> = {
   speech: ['localSttModel', 'provider', 'groqApiKey', 'localSttUrl', 'dictationLanguage'],
@@ -65,7 +85,7 @@ const SETTINGS_FIELDS: Record<SettingsSection, string[]> = {
   general: ['barDesign', 'microphoneDeviceId', 'hotkey', 'mode', 'retainAudio', 'startWithWindows'],
   style: ['writingStyle', 'geminiStructuredFormatting', 'contextAwarePunctuation', 'punctuationMode', 'autoLearnCorrections'],
 };
-const DASHBOARD_TABS: DashboardTab[] = ['dictation', 'notetaker', 'insights', 'dictionary', 'snippets', 'style', 'scratchpad', 'settings', 'models', 'text', 'account', 'admin'];
+const DASHBOARD_TABS: DashboardTab[] = ['dictation', 'words', 'setup', 'labs', 'notetaker', 'style', 'settings', 'models', 'text', 'account', 'admin'];
 
 export const DashboardApp: React.FC = () => {
   const [accountStatus,setAccountStatus]=useState<AccountStatus|null>(null);
@@ -128,6 +148,8 @@ export const DashboardApp: React.FC = () => {
     contextAwarePunctuation: true,
     punctuationMode: 'auto',
     barDesign: 'owl',
+    theme: 'system',
+    meetingNotesEnabled: false,
     setupCompleted: true,
     localSttUrl: 'http://localhost:8000/v1',
     localSttModel: 'base',
@@ -168,9 +190,6 @@ export const DashboardApp: React.FC = () => {
   const [newSnippetText, setNewSnippetText] = useState('');
   const [newSnippetDesc, setNewSnippetDesc] = useState('');
 
-  // Scratchpad state
-  const [scratchpadText, setScratchpadText] = useState('');
-  const [isScratchpadSaved, setIsScratchpadSaved] = useState(false);
 
   // Meeting Notetaker state
   const [isMeetingRecording, setIsMeetingRecording] = useState(false);
@@ -207,6 +226,7 @@ export const DashboardApp: React.FC = () => {
   const [languageModelNotice,setLanguageModelNotice]=useState('');
   const languageSelection=useRef(0);
   const [savedSettings, setSavedSettings] = useState<any>(null);
+  const [correctingId, setCorrectingId] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [startupStatus, setStartupStatus] = useState<{supported:boolean;enabled:boolean;error?:string}|null>(null);
@@ -223,6 +243,19 @@ export const DashboardApp: React.FC = () => {
     setSavedSettings((previous: any) => ({...previous, ...patch}));
   };
 
+  // Main sets nativeTheme from the saved choice, so the system color scheme reflects Auto, Light or Dark.
+  useEffect(() => {
+    const scheme = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => { document.documentElement.dataset.theme = scheme.matches ? 'dark' : 'light'; };
+    apply();
+    scheme.addEventListener('change', apply);
+    return () => scheme.removeEventListener('change', apply);
+  }, []);
+  const chooseTheme = (theme: 'system' | 'light' | 'dark') => {
+    applySavedSettings({ theme });
+    void (window as any).api.updateSettings({ theme }).catch((error: Error) => setSaveError(error.message));
+  };
+
   useEffect(() => {
     document.querySelector('.main-content')?.scrollTo({top: 0});
     setSaveError('');
@@ -237,7 +270,8 @@ export const DashboardApp: React.FC = () => {
     const devicesChanged = () => { void loadAudioDevices(false); };
     navigator.mediaDevices.addEventListener('devicechange', devicesChanged);
     const cleanupNavigation = (window as any).api.onDashboardNavigate((tab: string) => {
-      if (DASHBOARD_TABS.includes(tab as DashboardTab)) setActiveTab(tab as DashboardTab);
+      const target = TAB_ALIASES[tab] || tab;
+      if (DASHBOARD_TABS.includes(target as DashboardTab)) setActiveTab(target as DashboardTab);
     });
     let disposed = false;
     const refreshDictation = async () => {
@@ -291,8 +325,6 @@ export const DashboardApp: React.FC = () => {
       const snips = await (window as any).api.getSnippets?.();
       snippetsRef.current = snips || [];
       setSnippets(snippetsRef.current);
-      const scratch = await (window as any).api.getScratchpad?.();
-      setScratchpadText(scratch || '');
       const meetings = await (window as any).api.getMeetings?.();
       setMeetingNotes(meetings || []);
     } catch (e) {
@@ -610,14 +642,6 @@ export const DashboardApp: React.FC = () => {
     try { await snippetsSaveRef.current; } catch (e) { setSaveError(e instanceof Error ? e.message : 'Snippets could not be saved.'); await loadAll(); }
   };
 
-  const handleSaveScratchpad = async () => {
-    try {
-      await (window as any).api.setScratchpad?.(scratchpadText);
-      setSaveError(''); setIsScratchpadSaved(true);
-      setTimeout(() => setIsScratchpadSaved(false), 2000);
-    } catch (e) { setSaveError(e instanceof Error ? e.message : 'Scratchpad could not be saved.'); }
-  };
-
   const handleCopyHistory = async (text: string, id: string) => {
     try {
       await (window as any).api.copyText(text);
@@ -740,16 +764,30 @@ export const DashboardApp: React.FC = () => {
   let streak = 0;
   const day = new Date();
   while (activeDays.has(day.toDateString())) { streak += 1; day.setDate(day.getDate() - 1); }
-  const appCounts = history.reduce<Record<string, number>>((counts, item) => {
-    const app = item.processName || 'Unknown'; counts[app] = (counts[app] || 0) + 1; return counts;
-  }, {});
-  const topApps = Object.entries(appCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
-
+  const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const weekWords = history.filter(item => item.timestamp >= weekStart).reduce((acc, item) => acc + (item.wordCount || (item.formattedText || '').trim().split(/\s+/).filter(Boolean).length), 0);
+  const hoursSaved = totalRecordedWords / 40 / 60;
   const filteredHistory = history.filter(
     (item) =>
       (item.formattedText || '').toLowerCase().includes(searchHistory.toLowerCase()) ||
       (item.processName || '').toLowerCase().includes(searchHistory.toLowerCase())
   );
+  const dayLabel = (timestamp: number) => {
+    const date = new Date(timestamp), today = new Date(), yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' });
+  };
+  const historyGroups = filteredHistory.reduce<{ label: string; items: typeof filteredHistory }[]>((groups, item) => {
+    const label = dayLabel(item.timestamp), last = groups[groups.length - 1];
+    if (last?.label === label) last.items.push(item); else groups.push({ label, items: [item] });
+    return groups;
+  }, []);
+  const saveNow = (patch: Record<string, unknown>) => {
+    applySavedSettings(patch);
+    void (window as any).api.updateSettings(patch).catch((error: Error) => setSaveError(error.message));
+  };
   const microphoneName = audioDevices.find(device => device.deviceId === settings.microphoneDeviceId)?.label || 'System default';
   const speechModelName = settings.provider === 'local'
     ? speechModelLabel(settings.localSttModel || 'base')
@@ -766,78 +804,27 @@ export const DashboardApp: React.FC = () => {
           <div className="brand-icon"><img src={owlioIcon} alt="" width={32} height={32} /></div>
           <div>
             <div className="brand-title">Owlio</div>
-            <div style={{ fontSize: '11px', color: '#746F6B' }}>Voice & Meeting AI</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--c-746f6b)' }}>Voice typing</div>
           </div>
         </div>
 
         <nav className="nav-menu" aria-label="Main navigation">
-          <div className="nav-group-label">Workspace</div>
-          <button
-            className={`nav-item ${activeTab === 'dictation' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dictation')}
-          >
-            <Mic size={18} />
-            <span>Dictation</span>
+          <button className={`nav-item ${activeTab === 'dictation' ? 'active' : ''}`} aria-current={activeTab === 'dictation' ? 'page' : undefined} onClick={() => setActiveTab('dictation')}><Home size={18}/><span>Home</span></button>
+          <button className={`nav-item ${activeTab === 'words' ? 'active' : ''}`} aria-current={activeTab === 'words' ? 'page' : undefined} onClick={() => setActiveTab('words')}><BookA size={18}/><span>Word book</span></button>
+          <button className={`nav-item ${activeTab === 'setup' || SETUP_PAGES.includes(activeTab) ? 'active' : ''}`} aria-current={activeTab === 'setup' || SETUP_PAGES.includes(activeTab) ? 'page' : undefined} onClick={() => setActiveTab('setup')}>
+            <SettingsIcon size={18}/><span>Setup</span>{(['speech', 'text', 'general', 'style'] as SettingsSection[]).some(sectionDirty) && <span className="draft-dot" aria-label="Unsaved setup changes"/>}
           </button>
-
-          <button
-            className={`nav-item ${activeTab === 'notetaker' ? 'active' : ''}`}
-            onClick={() => setActiveTab('notetaker')}
-          >
-            <Users size={18} />
-            <span>Notetaker</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'insights' ? 'active' : ''}`}
-            onClick={() => setActiveTab('insights')}
-          >
-            <BarChart3 size={18} />
-            <span>Insights</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'dictionary' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dictionary')}
-          >
-            <BookA size={18} />
-            <span>Dictionary</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'snippets' ? 'active' : ''}`}
-            onClick={() => setActiveTab('snippets')}
-          >
-            <Scissors size={18} />
-            <span>Snippets</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'scratchpad' ? 'active' : ''}`}
-            onClick={() => setActiveTab('scratchpad')}
-          >
-            <FileText size={18} />
-            <span>Scratchpad</span>
-          </button>
-
-          <div className="nav-group-label configure-label">Configure</div>
-          <button className={`nav-item ${activeTab === 'account' || activeTab === 'admin' ? 'active' : ''}`} aria-current={activeTab === 'account' || activeTab === 'admin' ? 'page' : undefined} onClick={() => setActiveTab('account')}><ShieldCheck size={18}/><span>Account &amp; privacy</span></button>
-          <button className={`nav-item ${activeTab === 'models' ? 'active' : ''}`} aria-current={activeTab === 'models' ? 'page' : undefined} onClick={() => setActiveTab('models')}>
-            <Cpu size={18}/><span>Speech &amp; models</span>{sectionDirty('speech') && <span className="draft-dot" aria-label="Unsaved speech changes"/>}
-          </button>
-          <button className={`nav-item ${activeTab === 'text' || activeTab === 'style' ? 'active' : ''}`} aria-current={activeTab === 'text' || activeTab === 'style' ? 'page' : undefined} onClick={() => setActiveTab('text')}>
-            <Type size={18}/><span>Text &amp; style</span>{(sectionDirty('text') || sectionDirty('style')) && <span className="draft-dot" aria-label="Unsaved text changes"/>}
-          </button>
-          <button
-            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            <SettingsIcon size={18} />
-            <span>General settings</span>{sectionDirty('general') && <span className="draft-dot" aria-label="Unsaved general changes"/>}
-          </button>
+          <button className={`nav-item ${activeTab === 'labs' ? 'active' : ''}`} aria-current={activeTab === 'labs' ? 'page' : undefined} onClick={() => setActiveTab('labs')}><FlaskConical size={18}/><span>Labs</span></button>
+          {settings.meetingNotesEnabled && <button className={`nav-item nav-sub-item ${activeTab === 'notetaker' ? 'active' : ''}`} aria-current={activeTab === 'notetaker' ? 'page' : undefined} onClick={() => setActiveTab('notetaker')}><Users size={16}/><span>Meeting notes</span></button>}
         </nav>
 
         <div style={{ marginTop: 'auto', padding: '12px 8px' }}>
+          <div className="theme-switch" role="radiogroup" aria-label="Theme">
+            {([['system', 'Auto', Monitor], ['light', 'Light', Sun], ['dark', 'Dark', Moon]] as const).map(([value, label, Icon]) =>
+              <button key={value} type="button" role="radio" aria-checked={(settings.theme || 'system') === value} className={(settings.theme || 'system') === value ? 'active' : ''} onClick={() => chooseTheme(value)}>
+                <Icon size={14} aria-hidden="true" /><span>{label}</span>
+              </button>)}
+          </div>
           <button
             className="btn btn-secondary"
             style={{ width: '100%', justifyContent: 'center' }}
@@ -852,10 +839,19 @@ export const DashboardApp: React.FC = () => {
       {/* Main Content Area */}
       <div className="main-content">
         {accessLocked?<AccountPrivacy onContinue={()=>setActiveTab('dictation')} onAdmin={()=>{}}/>:settings.setupCompleted===false && activeTab!=='account' && activeTab!=='admin'?<FirstRunSetup onChange={applySavedSettings} onDone={()=>setActiveTab('models')} onAccount={()=>setActiveTab('account')}/>:<>
+        {(activeTab === 'setup' || SETUP_PAGES.includes(activeTab)) && <nav className="setup-steps" aria-label="Setup steps">
+          {SETUP_STEPS.map((step, index) => {
+            const current = activeTab === step.tab || (activeTab === 'admin' && step.tab === 'account');
+            return <button key={step.tab} className={`setup-step${current ? ' current' : ''}`} aria-current={current ? 'step' : undefined} onClick={() => setActiveTab(step.tab)}>
+              <span className="setup-step-name">{index + 1}. {step.label}{step.section && sectionDirty(step.section) && <span className="draft-dot" aria-label="Unsaved changes"/>}</span>
+              <span className="setup-step-hint">{step.hint}</span>
+            </button>;
+          })}
+        </nav>}
         {activeTab==='account' && <AccountPrivacy onContinue={()=>setActiveTab('dictation')} onAdmin={()=>setActiveTab('admin')}/>}
         {activeTab==='admin' && <AdminDashboard onBack={()=>setActiveTab('account')}/>}
         {saveError && (
-          <div className="card" role="alert" style={{ borderColor: 'rgba(239, 68, 68, 0.45)', color: '#B14848', marginBottom: '16px' }}>
+          <div className="card" role="alert" style={{ borderColor: 'rgba(239, 68, 68, 0.45)', color: 'var(--c-b14848)', marginBottom: '16px' }}>
             {saveError}
           </div>
         )}
@@ -864,10 +860,7 @@ export const DashboardApp: React.FC = () => {
           <section className="dictation-page" aria-label="Dictation dashboard">
               <div className="header-row">
                 <div>
-                  <h1 className="page-title">Your voice workspace</h1>
-                  <p style={{ color: '#746F6B', fontSize: '14px', marginTop: '4px' }}>
-                    {settings.mode === 'toggle' ? 'Press' : 'Hold'} {settings.hotkey} to dictate into your selected text field.
-                  </p>
+                  <h1 className="page-title">Home</h1>
                 </div>
               </div>
 
@@ -880,15 +873,15 @@ export const DashboardApp: React.FC = () => {
                   <span>Transcribed words that could not be inserted are kept in the history below. Copy them and paste into your text field.</span>
                 </div>
               )}
-              {/* Informational Banner */}
-              <div
-                className="dictation-banner"
-              >
-                <h2>Your words, without the keyboard.</h2>
-                <p>
-                   Language: <strong>{languageName(settings.dictationLanguage)}</strong>. {settings.provider === 'local' ? 'Speech recognition runs on this computer.'  : 'Audio is sent to the selected cloud provider.'} {settings.formattingProvider !== 'basic' && writingProvider(settings)==='gemini' && 'Text cleanup uses Gemini online.'}
-                </p>
+              <div className="owl-status" role="status">
+                <div className="owl-status-avatar"><OwlAvatar state="idle" awake /></div>
+                <div className="owl-status-text">
+                  <h2>Ready when you are</h2>
+                  <p>{settings.mode === 'toggle' ? 'Press' : 'Hold'} <kbd>{settings.hotkey}</kbd> to dictate · {languageName(settings.dictationLanguage)} · {settings.provider === 'local' ? 'Speech on this computer' : 'Cloud speech'}{settings.formattingProvider !== 'basic' && writingProvider(settings) === 'gemini' ? ' · Gemini cleanup' : ''}</p>
+                </div>
+                <span className="owl-status-badge">Ready</span>
               </div>
+              <p className="home-stats"><span><strong>{weekWords.toLocaleString()}</strong> words this week</span><span><strong>{hoursSaved >= 1 ? `${hoursSaved.toFixed(1)} h` : `${Math.round(hoursSaved * 60)} min`}</strong> saved</span><span><strong>{streak}</strong>-day streak</span>{averageWpm > 0 && <span><strong>{averageWpm}</strong> WPM</span>}</p>
 
               <div className="history-toolbar" role="group" aria-label="History controls">
                 <input
@@ -906,26 +899,25 @@ export const DashboardApp: React.FC = () => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {filteredHistory.length === 0 ? (
-                  <div className="card" style={{ textAlign: 'center', padding: '40px', color: '#746F6B' }}>
+                  <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--c-746f6b)' }}>
                     <Mic size={32} style={{ margin: '0 auto 12px auto', opacity: 0.5 }} />
                     <p>
                       No dictations yet. Hold your hotkey (<strong>{settings.hotkey}</strong>) and speak into your headset!
                     </p>
                   </div>
                 ) : (
-                  filteredHistory.map((item) => (
+                  historyGroups.map(group => <section key={group.label} className="history-day" aria-label={group.label}><h3 className="history-day-label">{group.label}</h3>{group.items.map((item) => (
                     <div key={item.id} className="history-item">
                       <div className="history-meta">
                         <span className="app-badge">{item.processName || 'Window'}</span>
                         {item.isInstruct && (
-                          <span className="app-badge" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#80559A' }}>
-                            ✨ Instruct
+                          <span className="app-badge" style={{ background: 'rgba(168, 85, 247, 0.2)', color: 'var(--c-80559a)' }}>
+                            Rewrite
                           </span>
                         )}
                         <span>{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        {item.wpm && <span style={{ color: '#396F68' }}>{item.wpm} WPM</span>}
 
-                        <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
                           {item.deliveryStatus === 'failed' && item.audioUrl && <button className="btn btn-secondary" disabled={Boolean(recoveringId)} onClick={async () => {
                             setRecoveringId(item.id);
                             try { await (window as any).api.recoverDictation(item.id); setCopiedId(item.id); }
@@ -935,19 +927,20 @@ export const DashboardApp: React.FC = () => {
                           {item.audioUrl && (
                             <button
                               className="btn btn-secondary"
-                              style={{ padding: '4px 8px', fontSize: '12px' }}
+                              style={{ padding: '4px 8px', fontSize: 'var(--text-xs)' }}
                               onClick={() => handlePlayAudio(item.audioUrl, item.id)}
                             >
-                              {playingId === item.id ? <Pause size={14} color="#396F68" /> : <Play size={14} color="#76608C" />}
+                              {playingId === item.id ? <Pause size={14} style={{ color: 'var(--c-396f68)' }} /> : <Play size={14} style={{ color: 'var(--c-76608c)' }} />}
                               <span>{playingId === item.id ? 'Pause' : 'Play Audio'}</span>
                             </button>
                           )}
+                          {canCorrect(item) && <button className="btn btn-secondary" aria-expanded={correctingId === item.id} onClick={() => setCorrectingId(correctingId === item.id ? '' : item.id)}><span>Correct</span></button>}
                           <button
                             className="btn btn-secondary"
-                            style={{ padding: '4px 8px', fontSize: '12px' }}
+                            style={{ padding: '4px 8px', fontSize: 'var(--text-xs)' }}
                             onClick={() => handleCopyHistory(item.editedText || item.formattedText, item.id)}
                           >
-                            {copiedId === item.id ? <Check size={14} color="#36754C" /> : <Copy size={14} />}
+                            {copiedId === item.id ? <Check size={14} style={{ color: 'var(--c-36754c)' }} /> : <Copy size={14} />}
                             <span>{copiedId === item.id ? 'Copied' : 'Copy'}</span>
                           </button>
                         </div>
@@ -956,52 +949,14 @@ export const DashboardApp: React.FC = () => {
                       {item.deliveryStatus === 'processing' && <p className="muted" role="status">Processing recording…</p>}
                       <div className="history-text">{item.editedText || item.formattedText || 'No transcript yet. Use Transcribe again if audio is available.'}</div>
                       {item.editedText && <p className="muted">Corrected version · Original dictation is retained.</p>}
-                      <HistoryCorrection item={item}/>
+                      <HistoryCorrection item={item} open={correctingId === item.id} onOpenChange={open => setCorrectingId(open ? item.id : '')}/>
                       {item.warning && <p className="muted">{item.warning}</p>}
                     </div>
-                  ))
+                  ))}</section>)
                 )}
               </div>
             </div>
 
-            <aside className="dictation-summary" aria-label="Activity and current setup" tabIndex={0}>
-              <section className="card activity-card" aria-labelledby="activity-heading">
-                <div className="summary-card-heading"><h2 id="activity-heading">Activity</h2><span>All time</span></div>
-                <dl className="activity-metrics">
-                  <div><dt>Total words</dt><dd>{totalRecordedWords.toLocaleString()}</dd></div>
-                  <div><dt>Average WPM</dt><dd>{averageWpm || '—'}</dd></div>
-                </dl>
-                <div className="activity-streak"><Flame size={16}/><span>{streak ? `${streak} day${streak === 1 ? '' : 's'} in a row` : 'Start a streak today'}</span></div>
-              </section>
-
-              <section className={`card current-setup${setupExpanded ? ' expanded' : ''}`} aria-labelledby="current-setup-heading">
-                <div className="summary-card-heading"><h2 id="current-setup-heading">Current setup</h2><button className="setup-expand" aria-label={setupExpanded ? 'Hide setup details' : 'Show setup details'} aria-expanded={setupExpanded} aria-controls="setup-summary-details" onClick={()=>setSetupExpanded(previous=>!previous)}><ChevronDown size={16}/></button></div>
-                <div className="setup-mode"><Zap size={14}/>{settings.provider === 'local' ? 'Local speech'  : 'Cloud speech'}</div>
-                <p className="setup-compact-value">{speechModelName} · {outputScript}</p>
-                <dl className="setup-summary-list" id="setup-summary-details">
-                  <div className="setup-summary-row">
-                    <dt><Cpu size={15}/>Speech recognition</dt>
-                    <dd><span>{speechModelName}</span>
-                      <p>{settings.provider === 'local' ? 'Audio processed on this computer'  : 'Audio sent to your speech provider'}</p>
-                      <button className="setup-change" aria-label="Change speech model" onClick={()=>setActiveTab('models')}>Change<ArrowUpRight size={13}/></button>
-                    </dd>
-                  </div>
-                  <div className="setup-summary-row">
-                    <dt><Mic size={15}/>Microphone</dt>
-                    <dd><span>{microphoneName}</span>
-                      <button className="setup-change" aria-label="Change microphone" onClick={()=>setActiveTab('settings')}>Change<ArrowUpRight size={13}/></button>
-                    </dd>
-                  </div>
-                  <div className="setup-summary-row">
-                    <dt><Type size={15}/>Text output</dt>
-                    <dd><span>{outputScript}</span>
-                      <p>{cleanupName}</p>
-                      <button className="setup-change" aria-label="Change text output" onClick={()=>setActiveTab('text')}>Change<ArrowUpRight size={13}/></button>
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-            </aside>
             </div>
           </section>
         )}
@@ -1012,7 +967,7 @@ export const DashboardApp: React.FC = () => {
             <div className="header-row">
               <div>
                 <h1 className="page-title">Meeting Notetaker</h1>
-                <p style={{ color: '#746F6B', fontSize: '14px', marginTop: '4px' }}>
+                <p style={{ color: 'var(--c-746f6b)', fontSize: 'var(--text-md)', marginTop: '4px' }}>
                   Records your microphone for up to two hours. Voices heard only through headphones are not captured. Turn on recording retention to retry unfinished recordings.
                 </p>
               </div>
@@ -1060,24 +1015,24 @@ export const DashboardApp: React.FC = () => {
                       width: '14px',
                       height: '14px',
                       borderRadius: '50%',
-                      background: '#EF4444',
+                      background: 'var(--c-ef4444)',
                       animation: 'pulse 1s infinite',
                     }}
                   />
                   <div>
                     <h4 style={{ fontWeight: 600 }}>Meeting Recording in Progress</h4>
-                    <p style={{ fontSize: '13px', color: '#746F6B' }}>Capturing microphone audio · two-hour limit</p>
+                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)' }}>Capturing microphone audio · two-hour limit</p>
                   </div>
                 </div>
-                <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'monospace', color: '#EF4444' }}>
+                <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, fontFamily: 'monospace', color: 'var(--c-ef4444)' }}>
                   {formatMeetingTime(meetingDuration)}
                 </div>
               </div>
             )}
 
             {isSummarizing && (
-              <div className="card" style={{ textAlign: 'center', padding: '30px' }}>
-                <p style={{ color: '#76608C' }}>Processing meeting audio and extracting action items...</p>
+              <div className="card" style={{ textAlign: 'center', padding: '32px' }}>
+                <p style={{ color: 'var(--c-76608c)' }}>Processing meeting audio and extracting action items...</p>
                 <button className="btn btn-secondary" onClick={() => void (window as any).api.cancelMeetingProcessing().catch((error: Error) => setMeetingError(error.message))}>Cancel processing</button>
               </div>
             )}
@@ -1085,22 +1040,22 @@ export const DashboardApp: React.FC = () => {
             {currentMeetingSummary && (
               <div className="card" style={{ borderColor: 'rgba(99, 102, 241, 0.3)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FileText size={18} color="#76608C" />
-                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Latest Meeting Summary</h3>
+                  <FileText size={18} style={{ color: 'var(--c-76608c)' }} />
+                  <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Latest Meeting Summary</h3>
                 </div>
-                <p style={{ fontSize: '14px', lineHeight: 1.6, color: '#292627', marginTop: '8px' }}>
+                <p style={{ fontSize: 'var(--text-md)', lineHeight: 1.6, color: 'var(--c-292627)', marginTop: '8px' }}>
                   {currentMeetingSummary}
                 </p>
 
                 {currentActionItems.length > 0 && (
                   <div style={{ marginTop: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <CheckSquare size={16} color="#36754C" />
-                      <span style={{ fontSize: '14px', fontWeight: 600 }}>Action Items / Todos</span>
+                      <CheckSquare size={16} style={{ color: 'var(--c-36754c)' }} />
+                      <span style={{ fontSize: 'var(--text-md)', fontWeight: 600 }}>Action Items / Todos</span>
                     </div>
-                    <ul style={{ listStyleType: 'disc', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <ul style={{ listStyleType: 'disc', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {currentActionItems.map((action, i) => (
-                        <li key={i} style={{ fontSize: '13px', color: '#514C4D' }}>
+                        <li key={i} style={{ fontSize: 'var(--text-sm)', color: 'var(--c-514c4d)' }}>
                           {action}
                         </li>
                       ))}
@@ -1117,7 +1072,7 @@ export const DashboardApp: React.FC = () => {
                     <h4 style={{ fontWeight: 600 }}>{note.title}</h4>
                     <span className="app-badge">{formatMeetingTime(note.duration)}</span>
                   </div>
-                  <p style={{ fontSize: '13px', color: '#746F6B', marginTop: '6px' }}>{note.summary}</p>
+                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)', marginTop: '4px' }}>{note.summary}</p>
                   {note.warning && <p className="delivery-error">{note.warning}</p>}
                   <details><summary>Transcript</summary><p style={{whiteSpace:'pre-wrap'}}>{note.transcript}</p></details>
                 </div>
@@ -1126,69 +1081,27 @@ export const DashboardApp: React.FC = () => {
           </>
         )}
 
-        {/* ================= INSIGHTS TAB ================= */}
-        {activeTab === 'insights' && (
+        {/* ================= WORD BOOK ================= */}
+        {activeTab === 'words' && (
           <>
             <div className="header-row">
               <div>
-                <h1 className="page-title">Voice Insights</h1>
-                <p style={{ color: '#746F6B', fontSize: '14px', marginTop: '4px' }}>
-                  Analytics on your dictation volume, speaking speed, and top applications.
+                <h1 className="page-title">Word book</h1>
+                <p style={{ color: 'var(--c-746f6b)', fontSize: 'var(--text-md)', marginTop: '4px' }}>
+                  Spellings Owlio should get right, and shortcuts it expands.
                 </p>
               </div>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-              <div className="card">
-                <div style={{ fontSize: '13px', color: '#746F6B' }}>Total Dictated Words</div>
-                <div style={{ fontSize: '28px', fontWeight: 700, color: '#292627', marginTop: '6px' }}>
-                  {totalRecordedWords.toLocaleString()}
-                </div>
-              </div>
-              <div className="card">
-                <div style={{ fontSize: '13px', color: '#746F6B' }}>Average Speaking Speed</div>
-                <div style={{ fontSize: '28px', fontWeight: 700, color: '#396F68', marginTop: '6px' }}>
-                  {averageWpm} <span style={{ fontSize: '14px', color: '#746F6B' }}>WPM</span>
-                </div>
-              </div>
-              <div className="card">
-                <div style={{ fontSize: '13px', color: '#746F6B' }}>Typing Time Saved</div>
-                <div style={{ fontSize: '28px', fontWeight: 700, color: '#36754C', marginTop: '6px' }}>
-                  {(totalRecordedWords / 40 / 60).toFixed(1)} <span style={{ fontSize: '14px', color: '#746F6B' }}>Hours</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Top Applications Dictated Into</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
-                 {topApps.length === 0 ? <p style={{ color: '#746F6B' }}>No application data yet.</p> : topApps.map(([app, count]) => (
-                   <div key={app} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                     <span style={{ fontSize: '14px', color: '#292627' }}>{app}</span>
-                     <span className="app-badge">{count} dictation{count === 1 ? '' : 's'}</span>
-                   </div>
-                 ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ================= DICTIONARY TAB ================= */}
-        {activeTab === 'dictionary' && (
-          <>
-            <div className="header-row">
+            <div className="header-row word-book-section">
               <div>
-                <h1 className="page-title">Custom Vocabulary</h1>
-                <p style={{ color: '#746F6B', fontSize: '14px', marginTop: '4px' }}>
-                  Define custom names, Hinglish phrases, acronyms, and automatic text replacements.
-                </p>
+                <h2 className="section-title">Spellings</h2>
               </div>
             </div>
 
             <WritingMemory view="vocabulary"/>
             <div className="card">
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Add word or replacement</h3>
-              <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+              <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Add word or replacement</h3>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                 <input
                   type="text"
                   className="input"
@@ -1218,12 +1131,12 @@ export const DashboardApp: React.FC = () => {
                   style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <span style={{ color: '#746F6B', fontFamily: 'monospace' }}>"{item.from}"</span>
-                    <span style={{ color: '#746F6B' }}>→</span>
-                    <span style={{ color: '#76608C', fontWeight: 600, fontFamily: 'monospace' }}>"{item.to}"</span>
+                    <span style={{ color: 'var(--c-746f6b)', fontFamily: 'monospace' }}>"{item.from}"</span>
+                    <span style={{ color: 'var(--c-746f6b)' }}>→</span>
+                    <span style={{ color: 'var(--c-76608c)', fontWeight: 600, fontFamily: 'monospace' }}>"{item.to}"</span>
                   </div>
-                  <button className="btn btn-secondary" style={{ padding: '6px' }} onClick={() => handleDeleteDictionaryItem(item.id)}>
-                    <Trash2 size={14} color="#B14848" />
+                  <button className="btn btn-secondary" style={{ padding: '4px' }} onClick={() => handleDeleteDictionaryItem(item.id)}>
+                    <Trash2 size={14} style={{ color: 'var(--c-b14848)' }} />
                   </button>
                 </div>
               ))}
@@ -1231,21 +1144,21 @@ export const DashboardApp: React.FC = () => {
           </>
         )}
 
-        {/* ================= SNIPPETS TAB ================= */}
-        {activeTab === 'snippets' && (
+        {/* ================= WORD BOOK SHORTCUTS ================= */}
+        {activeTab === 'words' && (
           <>
             <div className="header-row">
               <div>
-                <h1 className="page-title">Snippets</h1>
-                <p style={{ color: '#746F6B', fontSize: '14px', marginTop: '4px' }}>
-                  Expand voice trigger words into entire templated messages automatically.
+                <h2 className="section-title">Shortcuts</h2>
+                <p style={{ color: 'var(--c-746f6b)', fontSize: 'var(--text-md)', marginTop: '4px' }}>
+                  Say a trigger phrase and Owlio types the full text.
                 </p>
               </div>
             </div>
 
             <div className="card">
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Add New Snippet</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
+              <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Add shortcut</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
                 <input
                   type="text"
                   className="input"
@@ -1263,30 +1176,30 @@ export const DashboardApp: React.FC = () => {
               </div>
               <textarea
                 className="input"
-                style={{ marginTop: '10px', height: '80px', resize: 'vertical' }}
+                style={{ marginTop: '8px', height: '80px', resize: 'vertical' }}
                 placeholder="Expanded template text..."
                 value={newSnippetText}
                 onChange={(e) => setNewSnippetText(e.target.value)}
               />
-              <button className="btn btn-primary" style={{ marginTop: '10px' }} onClick={handleAddSnippet}>
+              <button className="btn btn-primary" style={{ marginTop: '8px' }} onClick={handleAddSnippet}>
                 <Plus size={16} />
-                <span>Add snippet</span>
+                <span>Add shortcut</span>
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {snippets.map((snip) => (
                 <div key={snip.id} className="card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span className="app-badge" style={{ fontFamily: 'monospace' }}>{snip.trigger}</span>
-                      <span style={{ fontSize: '13px', color: '#746F6B' }}>{snip.description}</span>
+                      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)' }}>{snip.description}</span>
                     </div>
-                    <button className="btn btn-secondary" style={{ padding: '6px' }} onClick={() => handleDeleteSnippet(snip.id)}>
-                      <Trash2 size={14} color="#B14848" />
+                    <button className="btn btn-secondary" style={{ padding: '4px' }} onClick={() => handleDeleteSnippet(snip.id)}>
+                      <Trash2 size={14} style={{ color: 'var(--c-b14848)' }} />
                     </button>
                   </div>
-                  <div style={{ marginTop: '8px', fontSize: '14px', color: '#292627', whiteSpace: 'pre-wrap' }}>
+                  <div style={{ marginTop: '8px', fontSize: 'var(--text-md)', color: 'var(--c-292627)', whiteSpace: 'pre-wrap' }}>
                     {snip.replacement}
                   </div>
                 </div>
@@ -1300,18 +1213,14 @@ export const DashboardApp: React.FC = () => {
           <section className="style-page" aria-label="Writing style">
             <div className="header-row">
               <div>
-                <h1 className="page-title">Text &amp; style</h1>
-                <p style={{ color: '#746F6B', fontSize: '14px', marginTop: '4px' }}>
+                <h1 className="page-title">Writing style</h1>
+                <p style={{ color: 'var(--c-746f6b)', fontSize: 'var(--text-md)', marginTop: '4px' }}>
                   Your writing tone, smart lists, punctuation and personal rules.
                 </p>
               </div>
               {saveButton('style')}
             </div>
 
-            <div className="settings-subnav" aria-label="Text settings views">
-              <button onClick={()=>setActiveTab('text')}>Output &amp; cleanup{sectionDirty('text') && <span className="draft-dot" aria-label="Unsaved output changes"/>}</button>
-              <button className="selected" aria-current="page" onClick={()=>setActiveTab('style')}>Writing style</button>
-            </div>
             <StyleSettings settings={settings} onChange={patch=>setSettings((previous:any)=>({...previous,...patch}))} onOpenSettings={()=>setActiveTab('text')}/>
             <details className="settings-disclosure settings-advanced"><summary>Advanced writing preferences<span>Correction learning and custom rules</span></summary>
             <section className="card writing-learning" aria-label="Correction learning">
@@ -1326,37 +1235,39 @@ export const DashboardApp: React.FC = () => {
           </section>
         )}
 
-        {/* ================= SCRATCHPAD TAB ================= */}
-        {activeTab === 'scratchpad' && (
-          <>
-            <div className="header-row">
-              <div>
-                <h1 className="page-title">Scratchpad</h1>
-                <p style={{ color: '#746F6B', fontSize: '14px', marginTop: '4px' }}>
-                  A place for ideas, notes and drafts. Select Save draft to keep your text.
-                </p>
-              </div>
-              <button className="btn btn-primary" onClick={handleSaveScratchpad}>
-                {isScratchpadSaved ? <Check size={16} /> : <FileText size={16} />}
-                <span>{isScratchpadSaved ? 'Saved!' : 'Save draft'}</span>
-              </button>
+        {/* ================= SETUP ================= */}
+        {activeTab === 'setup' && (
+          <section className="setup-page" aria-label="Setup">
+            <div className="header-row"><div><h1 className="page-title">Setup</h1><p className="page-description">Everything Owlio needs, on one page.</p></div></div>
+            <div className="card setup-list">
+              <div className="setup-row"><div><span className="setup-row-label">Speech</span><span>{speechModelName} · {settings.provider === 'local' ? 'on this computer' : 'cloud'}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('models')}>Change</button></div>
+              <div className="setup-row"><div><span className="setup-row-label">Language</span><span>{languageName(settings.dictationLanguage)}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('models')}>Change</button></div>
+              <div className="setup-row"><div><span className="setup-row-label">Text</span><span>{settings.formattingProvider === 'basic' ? 'Basic punctuation' : `AI cleanup with ${writingProvider(settings) === 'gemini' ? 'Gemini' : 'Ollama'}`}{settings.romanizationProvider === 'gemini' && usesHindiConversion(settings.dictationLanguage) ? ' · Roman Hinglish' : ''}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('text')}>Change</button></div>
+              <div className="setup-row"><div><span className="setup-row-label">Writing style</span><span>{({ auto: 'Automatic', casual: 'Casual', professional: 'Professional', code: 'Code' } as Record<string, string>)[settings.writingStyle] || 'Automatic'}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('style')}>Change</button></div>
+              <div className="setup-row"><div><span className="setup-row-label">Shortcut and microphone</span><span>{settings.mode === 'toggle' ? 'Press' : 'Hold'} {settings.hotkey} · {microphoneName}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('settings')}>Change</button></div>
+              <div className="setup-row"><div><span className="setup-row-label">Companion</span><span>{BAR_DESIGNS.find(item => item.id === settings.barDesign)?.name || 'Owl'}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('settings')}>Change</button></div>
+              <label className="setup-row setup-toggle"><div><span className="setup-row-label">Recordings</span><span>Keep recordings for 7 days, then delete them</span></div><input type="checkbox" role="switch" checked={settings.retainAudio !== false} onChange={event => saveNow({ retainAudio: event.target.checked })}/></label>
+              <div className="setup-row"><div><span className="setup-row-label">Account and privacy</span><span>{accountStatus?.user ? 'Signed in' : 'Guest · no usage data sent'}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('account')}>Open</button></div>
             </div>
+            <div className="setup-step-footer"><span className="muted">Go through each step, or change one setting above.</span><button className="btn btn-primary" onClick={() => setActiveTab('models')}><span>Start: Speech</span><ArrowRight size={16}/></button></div>
+          </section>
+        )}
 
-            <textarea
-              className="input"
-              style={{
-                width: '100%',
-                height: '420px',
-                fontSize: '15px',
-                lineHeight: 1.6,
-                padding: '16px',
-                resize: 'vertical',
-              }}
-              value={scratchpadText}
-              onChange={(e) => setScratchpadText(e.target.value)}
-              placeholder={`Click here to type, or ${settings.mode === 'toggle' ? 'press' : 'hold'} ${settings.hotkey || 'your shortcut'} to dictate…`}
-            />
-          </>
+        {/* ================= LABS ================= */}
+        {activeTab === 'labs' && (
+          <section className="labs-page" aria-label="Labs">
+            <div className="header-row"><div><h1 className="page-title">Labs</h1><p className="page-description">Extra features, off by default. Turn on what you need.</p></div></div>
+            <div className="card labs-card">
+              <Users size={20} aria-hidden="true"/>
+              <div><h3>Meeting notes</h3><p className="muted">Record a meeting and get a transcript and summary.</p>{settings.meetingNotesEnabled && <button className="btn btn-secondary" onClick={() => setActiveTab('notetaker')}>Open meeting notes</button>}</div>
+              <input type="checkbox" role="switch" aria-label="Meeting notes" checked={!!settings.meetingNotesEnabled} onChange={event => saveNow({ meetingNotesEnabled: event.target.checked })}/>
+            </div>
+            <div className="card labs-card">
+              <Sparkles size={20} aria-hidden="true"/>
+              <div><h3>Voice rewrites</h3><p className="muted">Select text and say how to change it. Needs a Writing AI (Gemini or Ollama).</p><button className="btn btn-secondary" onClick={() => setActiveTab('text')}>{settings.instructModeEnabled ? 'Change' : 'Set up'}</button></div>
+              <span className={`labs-state${settings.instructModeEnabled ? ' on' : ''}`}>{settings.instructModeEnabled ? 'On' : 'Off'}</span>
+            </div>
+          </section>
         )}
 
         {/* ================= SPEECH & MODELS ================= */}
@@ -1395,7 +1306,7 @@ export const DashboardApp: React.FC = () => {
                 <details className="settings-disclosure settings-advanced speech-connection">
                   <summary>Connection settings<span>Only needed for a custom speech server</span></summary>
                   <div>
-                    <label htmlFor="speech-server-address" style={{ fontSize: '13px', color: '#746F6B', display: 'block', marginBottom: '6px' }}>
+                    <label htmlFor="speech-server-address" style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)', display: 'block', marginBottom: '4px' }}>
                       Speech server address
                     </label>
                     <input
@@ -1405,7 +1316,7 @@ export const DashboardApp: React.FC = () => {
                       value={settings.localSttUrl || 'http://localhost:8000/v1'}
                       onChange={(e) => setSettings({ ...settings, localSttUrl: e.target.value })}
                     />
-                    <div style={{ fontSize: '11px', color: '#746F6B', marginTop: '4px' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--c-746f6b)', marginTop: '4px' }}>
                       Owlio starts managed speech automatically. Save address changes before managing models.
                     </div>
                   </div>
@@ -1414,7 +1325,7 @@ export const DashboardApp: React.FC = () => {
 
               {settings.provider === 'groq' && (
                 <div style={{ marginTop: '12px' }}>
-                  <label htmlFor="groq-speech-key" style={{ fontSize: '13px', color: '#746F6B', display: 'block', marginBottom: '6px' }}>
+                  <label htmlFor="groq-speech-key" style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)', display: 'block', marginBottom: '4px' }}>
                     Groq API Key
                   </label>
                   <input
@@ -1467,21 +1378,14 @@ export const DashboardApp: React.FC = () => {
             {settings.provider === 'local' && <LocalSpeechSettings settings={settings} currentModel={savedSettings?.localSttModel} onChange={patch=>{if(patch.localSttModel!==undefined)setLanguageModelNotice('');setSettings((previous:any)=>({...previous,...patch}));}} onConnected={syncSetupSettings} onOpenWizard={()=>{
               void(window as any).api.updateSettings({setupCompleted:false}).then(()=>setSettings((previous:any)=>({...previous,setupCompleted:false}))).catch((error:Error)=>setSaveError(error.message));
             }}/>}
-            <button className="btn btn-secondary style-link" onClick={()=>setActiveTab('text')}>Choose text output &amp; cleanup →</button>
           </section>
         )}
 
         {/* ================= TEXT OUTPUT ================= */}
         {activeTab === 'text' && (
           <section className="settings-page text-page" aria-label="Text output and cleanup">
-            <div className="header-row"><div><h1 className="page-title">Text &amp; style</h1><p className="page-description">Choose the script, cleanup and writing behavior of your pasted text.</p></div>{saveButton('text')}</div>
-            <div className="settings-subnav" aria-label="Text settings views">
-              <button className="selected" aria-current="page" onClick={()=>setActiveTab('text')}>Output &amp; cleanup</button>
-              <button onClick={()=>setActiveTab('style')}>Writing style{sectionDirty('style') && <span className="draft-dot" aria-label="Unsaved writing style changes"/>}</button>
-            </div>
-            <DictationFlow settings={settings}/>
+            <div className="header-row"><div><h1 className="page-title">Text output</h1><p className="page-description">Choose the script and cleanup of your pasted text.</p></div>{saveButton('text')}</div>
             <WritingSettings settings={settings} onChange={patch=>setSettings((previous:any)=>({...previous,...patch}))}/>
-            <button className="btn btn-secondary style-link" onClick={()=>setActiveTab('style')}>Writing style →</button>
             <p className="settings-save-note">Use <strong>Save settings</strong> to apply all pending settings.</p>
           </section>
         )}
@@ -1489,10 +1393,10 @@ export const DashboardApp: React.FC = () => {
         {/* ================= GENERAL SETTINGS ================= */}
         {activeTab === 'settings' && (
           <section className="settings-page" aria-label="General settings">
-            <div className="header-row"><div><h1 className="page-title">General settings</h1><p className="page-description">Your microphone, shortcuts, floating bar and recording history.</p></div>{saveButton('general')}</div>
+            <div className="header-row"><div><h1 className="page-title">Shortcut and more</h1><p className="page-description">Your shortcut, microphone, floating bar and recordings.</p></div>{saveButton('general')}</div>
             <p className="settings-save-note"><strong>Save settings</strong> applies all pending settings.</p>
             <section className="card" aria-labelledby="startup-heading">
-              <h3 id="startup-heading" style={{ fontSize: '16px', fontWeight: 600 }}>Startup</h3>
+              <h3 id="startup-heading" style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Startup</h3>
               <label className="structure-toggle" htmlFor="start-with-windows">
                 <input id="start-with-windows" type="checkbox" checked={settings.startWithWindows === true} disabled={!startupStatus?.supported || !!startupStatus.error} onChange={event => setSettings((previous:any) => ({...previous,startWithWindows:event.target.checked}))} aria-describedby="startup-description"/>
                 Start Owlio when I sign in to Windows
@@ -1501,15 +1405,15 @@ export const DashboardApp: React.FC = () => {
             </section>
             {/* Microphone Selection & Comprehensive Quality Diagnostic Suite */}
             <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Volume2 size={20} color="#396F68" />
-                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Your microphone</h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Volume2 size={20} style={{ color: 'var(--c-396f68)' }} />
+                  <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Your microphone</h3>
                 </div>
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '12px', height: '28px' }}
+                  style={{ padding: '4px 8px', fontSize: 'var(--text-xs)', height: '28px' }}
                   onClick={() => void loadAudioDevices(true)}
                   title="Rescan connected audio devices"
                 >
@@ -1517,12 +1421,12 @@ export const DashboardApp: React.FC = () => {
                   <span>Rescan mics</span>
                 </button>
               </div>
-              <p style={{ fontSize: '13px', color: '#746F6B', marginTop: '4px' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--c-746f6b)', marginTop: '4px' }}>
                 Use the Windows default or choose a microphone. Run a live level test or record a sample to inspect audio quality.
               </p>
 
               {/* Device Dropdown & Primary Test Action */}
-              <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
                 <select
                   aria-label="Your microphone"
                   className="select"
@@ -1578,29 +1482,29 @@ export const DashboardApp: React.FC = () => {
 
               {/* Live VU Meter with Peak Hold & Decay */}
               {isTestingMic && (
-                <div style={{ marginTop: '14px', padding: '14px', background: '#EDEAE3', borderRadius: '10px', border: '1px solid #DFD9CF' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#65535B', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Radio size={14} color={micTestVolume > 0.1 ? '#2E7D32' : '#746F6B'} />
+                <div style={{ marginTop: '12px', padding: '12px', background: 'var(--c-edeae3)', borderRadius: '10px', border: '1px solid var(--c-dfd9cf)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-xs)', color: 'var(--c-65535b)', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Radio size={14} style={{ color: micTestVolume > 0.1 ? 'var(--c-2e7d32)' : 'var(--c-746f6b)' }} />
                       <strong style={{ fontWeight: 600 }}>Live Input Signal:</strong>
                       <span>{Math.round(micTestVolume * 100)}% Volume</span>
-                      {micTestDb > -90 && <span style={{ color: '#8A827D' }}>({micTestDb} dBFS)</span>}
+                      {micTestDb > -90 && <span style={{ color: 'var(--c-8a827d)' }}>({micTestDb} dBFS)</span>}
                     </div>
-                    <div style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ color: '#8A827D' }}>Peak:</span>
-                      <strong style={{ color: micPeakVolume > 0.85 ? '#DC2626' : micPeakVolume > 0.2 ? '#2E7D32' : '#8A827D' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ color: 'var(--c-8a827d)' }}>Peak:</span>
+                      <strong style={{ color: micPeakVolume > 0.85 ? 'var(--c-dc2626)' : micPeakVolume > 0.2 ? 'var(--c-2e7d32)' : 'var(--c-8a827d)' }}>
                         {Math.round(micPeakVolume * 100)}%
                       </strong>
                     </div>
                   </div>
 
                   {/* Multi-segment Level Bar with Peak Indicator */}
-                  <div style={{ position: 'relative', width: '100%', height: '12px', background: '#DDD7CD', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ position: 'relative', width: '100%', height: '12px', background: 'var(--c-ddd7cd)', borderRadius: '6px', overflow: 'hidden' }}>
                     <div
                       style={{
                         width: `${Math.min(100, micTestVolume * 100)}%`,
                         height: '100%',
-                        background: micTestVolume > 0.85 ? '#DC2626' : micTestVolume > 0.65 ? '#D97706' : micTestVolume > 0.08 ? '#2E7D32' : '#A8A29E',
+                        background: micTestVolume > 0.85 ? 'var(--c-dc2626)' : micTestVolume > 0.65 ? 'var(--c-d97706)' : micTestVolume > 0.08 ? 'var(--c-2e7d32)' : 'var(--c-a8a29e)',
                         transition: 'width 0.04s ease-out, background-color 0.1s ease',
                       }}
                     />
@@ -1613,7 +1517,7 @@ export const DashboardApp: React.FC = () => {
                           left: `${Math.min(99, micPeakVolume * 100)}%`,
                           width: '2px',
                           height: '100%',
-                          background: '#1F2937',
+                          background: 'var(--c-1f2937)',
                           boxShadow: '0 0 2px rgba(0,0,0,0.5)',
                         }}
                       />
@@ -1621,21 +1525,21 @@ export const DashboardApp: React.FC = () => {
                   </div>
 
                   {/* Live Feedback Status */}
-                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-xs)' }}>
                     {micTestVolume < 0.03 ? (
-                      <span style={{ color: '#9E9A95', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ color: 'var(--c-9e9a95)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <VolumeX size={14} /> Silent / No signal — speak or check if your microphone is unmuted.
                       </span>
                     ) : micTestVolume < 0.2 ? (
-                      <span style={{ color: '#B45309', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ color: 'var(--c-b45309)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <AlertTriangle size={14} /> Low volume — speak closer to the mic or raise Windows input volume.
                       </span>
                     ) : micTestVolume <= 0.85 ? (
-                      <span style={{ color: '#2E7D32', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500 }}>
+                      <span style={{ color: 'var(--c-2e7d32)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
                         <CheckCircle2 size={14} /> Clear speech level (Optimal for Whisper).
                       </span>
                     ) : (
-                      <span style={{ color: '#DC2626', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500 }}>
+                      <span style={{ color: 'var(--c-dc2626)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
                         <AlertTriangle size={14} /> Very loud — watch out for clipping / audio distortion.
                       </span>
                     )}
@@ -1645,32 +1549,32 @@ export const DashboardApp: React.FC = () => {
 
               {/* Quality Sample Recording in Progress */}
               {isRecordingQualitySample && (
-                <div style={{ marginTop: '14px', padding: '16px', background: '#FBF0EE', border: '1px solid #F5C6CB', borderRadius: '10px', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', color: '#9B2C2C', fontWeight: 600 }}>
-                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#E53E3E', animation: 'pulse 1s infinite' }} />
+                <div style={{ marginTop: '12px', padding: '16px', background: 'var(--c-fbf0ee)', border: '1px solid var(--c-f5c6cb)', borderRadius: '10px', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--c-9b2c2c)', fontWeight: 600 }}>
+                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--c-e53e3e)', animation: 'pulse 1s infinite' }} />
                     <span>Speak naturally: testing voice clarity &amp; noise floor ({qualityCountdown}s remaining)...</span>
                   </div>
-                  <p style={{ fontSize: '12px', color: '#746F6B', marginTop: '6px' }}>Say a normal test sentence like "Owlio dictation is working nicely on my Windows PC."</p>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--c-746f6b)', marginTop: '4px' }}>Say a normal test sentence like "Owlio dictation is working nicely on my Windows PC."</p>
                 </div>
               )}
 
               {/* Quality Analysis & Audio Playback Box */}
               {!isRecordingQualitySample && qualitySampleUrl && qualityMetrics && (
-                <div style={{ marginTop: '14px', padding: '16px', background: '#F8F6F2', border: '1px solid #E5DFD5', borderRadius: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ marginTop: '12px', padding: '16px', background: 'var(--c-f8f6f2)', border: '1px solid var(--c-e5dfd5)', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {qualityMetrics.status === 'optimal' ? (
-                        <CheckCircle2 size={20} color="#2E7D32" />
+                        <CheckCircle2 size={20} style={{ color: 'var(--c-2e7d32)' }} />
                       ) : qualityMetrics.status === 'silent' ? (
-                        <VolumeX size={20} color="#DC2626" />
+                        <VolumeX size={20} style={{ color: 'var(--c-dc2626)' }} />
                       ) : (
-                        <AlertTriangle size={20} color="#D97706" />
+                        <AlertTriangle size={20} style={{ color: 'var(--c-d97706)' }} />
                       )}
                       <div>
-                        <strong style={{ fontSize: '14px', color: qualityMetrics.status === 'optimal' ? '#2E7D32' : qualityMetrics.status === 'silent' ? '#DC2626' : '#B45309' }}>
+                        <strong style={{ fontSize: 'var(--text-md)', color: qualityMetrics.status === 'optimal' ? 'var(--c-2e7d32)' : qualityMetrics.status === 'silent' ? 'var(--c-dc2626)' : 'var(--c-b45309)' }}>
                           {qualityMetrics.verdict}
                         </strong>
-                        <div style={{ fontSize: '12px', color: '#746F6B' }}>5-second test recording analyzed</div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--c-746f6b)' }}>5-second test recording analyzed</div>
                       </div>
                     </div>
 
@@ -1679,7 +1583,7 @@ export const DashboardApp: React.FC = () => {
                       type="button"
                       className={`btn ${qualityIsPlaying ? 'btn-danger' : 'btn-secondary'}`}
                       onClick={handleToggleQualityPlayback}
-                      style={{ padding: '6px 14px', fontSize: '13px' }}
+                      style={{ padding: '4px 12px', fontSize: 'var(--text-sm)' }}
                     >
                       {qualityIsPlaying ? <Pause size={15} /> : <Play size={15} />}
                       <span>{qualityIsPlaying ? 'Stop listening' : 'Listen to recording'}</span>
@@ -1687,28 +1591,28 @@ export const DashboardApp: React.FC = () => {
                   </div>
 
                   {/* Metrics Badges */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginTop: '14px' }}>
-                    <div style={{ padding: '8px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBE5DC' }}>
-                      <span style={{ fontSize: '11px', color: '#8A827D', display: 'block' }}>Peak Level</span>
-                      <strong style={{ fontSize: '13px', color: qualityMetrics.peakDb > -6 ? '#DC2626' : qualityMetrics.peakDb > -24 ? '#2E7D32' : '#B45309' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginTop: '12px' }}>
+                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '6px', border: '1px solid var(--c-ebe5dc)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)', display: 'block' }}>Peak Level</span>
+                      <strong style={{ fontSize: 'var(--text-sm)', color: qualityMetrics.peakDb > -6 ? 'var(--c-dc2626)' : qualityMetrics.peakDb > -24 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
                         {qualityMetrics.peakDb} dBFS
                       </strong>
                     </div>
-                    <div style={{ padding: '8px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBE5DC' }}>
-                      <span style={{ fontSize: '11px', color: '#8A827D', display: 'block' }}>Speech Volume</span>
-                      <strong style={{ fontSize: '13px', color: qualityMetrics.speechRmsDb > -30 ? '#2E7D32' : '#B45309' }}>
+                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '6px', border: '1px solid var(--c-ebe5dc)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)', display: 'block' }}>Speech Volume</span>
+                      <strong style={{ fontSize: 'var(--text-sm)', color: qualityMetrics.speechRmsDb > -30 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
                         {qualityMetrics.speechRmsDb} dBFS
                       </strong>
                     </div>
-                    <div style={{ padding: '8px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBE5DC' }}>
-                      <span style={{ fontSize: '11px', color: '#8A827D', display: 'block' }}>Noise Floor</span>
-                      <strong style={{ fontSize: '13px', color: qualityMetrics.noiseFloorDb < -35 ? '#2E7D32' : '#B45309' }}>
+                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '6px', border: '1px solid var(--c-ebe5dc)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)', display: 'block' }}>Noise Floor</span>
+                      <strong style={{ fontSize: 'var(--text-sm)', color: qualityMetrics.noiseFloorDb < -35 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
                         {qualityMetrics.noiseFloorDb} dBFS
                       </strong>
                     </div>
-                    <div style={{ padding: '8px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBE5DC' }}>
-                      <span style={{ fontSize: '11px', color: '#8A827D', display: 'block' }}>Signal-to-Noise</span>
-                      <strong style={{ fontSize: '13px', color: qualityMetrics.snr > 15 ? '#2E7D32' : '#B45309' }}>
+                    <div style={{ padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '6px', border: '1px solid var(--c-ebe5dc)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)', display: 'block' }}>Signal-to-Noise</span>
+                      <strong style={{ fontSize: 'var(--text-sm)', color: qualityMetrics.snr > 15 ? 'var(--c-2e7d32)' : 'var(--c-b45309)' }}>
                         ~{qualityMetrics.snr} dB
                       </strong>
                     </div>
@@ -1716,8 +1620,8 @@ export const DashboardApp: React.FC = () => {
 
                   {/* Recommendations */}
                   {qualityMetrics.recommendations.length > 0 && (
-                    <div style={{ marginTop: '12px', padding: '10px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBE5DC', fontSize: '12px', color: '#574F4A' }}>
-                      <strong style={{ display: 'block', marginBottom: '4px', color: '#413833' }}>Recommendations:</strong>
+                    <div style={{ marginTop: '12px', padding: '8px 12px', background: 'var(--c-ffffff)', borderRadius: '6px', border: '1px solid var(--c-ebe5dc)', fontSize: 'var(--text-xs)', color: 'var(--c-574f4a)' }}>
+                      <strong style={{ display: 'block', marginBottom: '4px', color: 'var(--c-413833)' }}>Recommendations:</strong>
                       <ul style={{ paddingLeft: '18px', margin: 0 }}>
                         {qualityMetrics.recommendations.map((rec, i) => (
                           <li key={i} style={{ marginTop: i > 0 ? '3px' : 0 }}>{rec}</li>
@@ -1729,13 +1633,13 @@ export const DashboardApp: React.FC = () => {
               )}
 
               {/* Hardware DSP Processing Controls */}
-              <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #E8E3DA' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                  <strong style={{ fontSize: '12px', color: '#5B5357', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Audio Processing Enhancements</strong>
-                  <span style={{ fontSize: '11px', color: '#8A827D' }}>Applies to both dictation &amp; tests</span>
+              <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--c-e8e3da)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+                  <strong style={{ fontSize: 'var(--text-xs)', color: 'var(--c-5b5357)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Audio Processing Enhancements</strong>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)' }}>Applies to both dictation &amp; tests</span>
                 </div>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={micNoiseSuppression}
@@ -1746,7 +1650,7 @@ export const DashboardApp: React.FC = () => {
                     />
                     Noise suppression
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={micAutoGainControl}
@@ -1757,7 +1661,7 @@ export const DashboardApp: React.FC = () => {
                     />
                     Auto gain control (AGC)
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={micEchoCancellation}
@@ -1769,7 +1673,7 @@ export const DashboardApp: React.FC = () => {
                     Echo cancellation
                   </label>
                 </div>
-                <p style={{ fontSize: '11px', color: '#8A827D', marginTop: '6px' }}>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--c-8a827d)', marginTop: '4px' }}>
                   Tip: If using an external USB audio interface (like USB-UAC AP) or studio condenser mic, turning off Auto Gain Control often provides cleaner, more natural sound.
                 </p>
               </div>
@@ -1782,16 +1686,25 @@ export const DashboardApp: React.FC = () => {
             <AppearanceSettings design={settings.barDesign} onSaved={barDesign => setSettings((previous:any)=>({...previous,barDesign}))} />
 
             <div className="card">
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Recording history</h3>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+              <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Recording history</h3>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-md)' }}>
                 <input type="checkbox" checked={settings.retainAudio !== false} onChange={(e) => setSettings({ ...settings, retainAudio: e.target.checked })} />
                 Save audio recordings
               </label>
-              <p style={{ fontSize: '12px', color: '#746F6B', marginTop: '6px' }}>Keep new recordings for playback in History. Turn off to save transcripts only.</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--c-746f6b)', marginTop: '4px' }}>Keep recordings for 7 days for playback on Home, then delete them. Turn off to keep transcripts only.</p>
             </div>
             <PrivacySettings/>
           </section>
         )}
+        {SETUP_PAGES.includes(activeTab) && (() => {
+          const index = SETUP_STEPS.findIndex(step => step.tab === (activeTab === 'admin' ? 'account' : activeTab));
+          const previous = SETUP_STEPS[index - 1], next = SETUP_STEPS[index + 1];
+          return <div className="setup-step-footer">
+            {previous ? <button className="btn btn-secondary" onClick={() => setActiveTab(previous.tab)}><ArrowLeft size={16}/><span>{previous.label}</span></button> : <span/>}
+            {next ? <button className="btn btn-primary" onClick={() => setActiveTab(next.tab)}><span>Next: {next.label}</span><ArrowRight size={16}/></button>
+              : <button className="btn btn-primary" onClick={() => setActiveTab('setup')}><Check size={16}/><span>Done</span></button>}
+          </div>;
+        })()}
         </>}
       </div>
     </div>
