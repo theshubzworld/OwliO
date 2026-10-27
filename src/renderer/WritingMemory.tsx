@@ -31,7 +31,7 @@ export function WritingMemory({ view }: {view:'preferences'|'vocabulary'}) {
   });
   return <section className="card writing-memory" aria-label={view==='preferences'?'Saved writing preferences':'Learned spellings'}>
     <h3>{view==='preferences'?'Your writing preferences':'Learned spellings'}</h3>
-    <p className="muted">{view==='preferences'?'Rules guide AI cleanup. Requires a Writing AI connection.':'Accepted spellings improve AI cleanup. Review suggestions before they are used.'}</p>
+    <p className="muted">{view==='preferences'?'Rules guide AI cleanup. Requires a Writing AI connection.':'Accepted spellings fix future dictations, with or without Gemini. Review suggestions before they are used.'}</p>
     {view==='preferences'&&<p className="muted">Rules save immediately.</p>}
     {view==='preferences' && <form className="memory-form" onSubmit={event=>{
       event.preventDefault();if(busy||!rule.trim())return;

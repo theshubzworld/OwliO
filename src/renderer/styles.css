@@ -1107,3 +1107,6 @@ body { margin: 0; font-family: var(--font); font-size: var(--text-md); line-heig
 .setup-steps .setup-step { border-radius: var(--radius-md); }
 .setup-list { padding: 0; }
 @media (prefers-reduced-motion: reduce) { .nav-item, .btn, .dictation-feed .history-item .btn { transition: none; } }
+
+/* Marks options that only work with Gemini cleanup. */
+.needs-gemini { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--accent-soft); color: var(--accent-ink); font-size: var(--text-xs); font-weight: 600; vertical-align: middle; }

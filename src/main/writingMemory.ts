@@ -8,9 +8,14 @@ export function matchingPreferences(preferences: WritingPreference[], context: W
 export function preferredVocabulary(words: LearnedWord[]): {word:string;observedSource:string}[] {
   return words.filter(word => word.status === 'learned').sort((a,b) => b.count-a.count || b.lastUsed-a.lastUsed).slice(0,80).map(({word,observedSource})=>({word,observedSource}));
 }
+// Accepted spellings fix future dictations even without AI cleanup, like Word book spellings.
+export function learnedSpellings(words: LearnedWord[]): {from:string;to:string}[] {
+  return words.filter(word => word.status === 'learned' && word.observedSource && word.observedSource.toLocaleLowerCase() !== word.word.toLocaleLowerCase()).map(word => ({from: word.observedSource, to: word.word}));
+}
 export function writingCategory(context: WindowContext): 'chat' | 'email' | 'code' | 'other' {
   const app = canonicalApp(context.processName);
-  if (/^(code|cursor|windsurf|devenv|windowsterminal|powershell|pwsh|cmd)$/.test(app)) return 'code';
+  // Code editors and terminals; some desktop IDEs report a suffix such as "ide".
+  if (/^(code|code - insiders|cursor|windsurf|antigravity|antigravity ide|zed|kiro|trae|devenv|sublime_text|notepad\+\+|idea64|pycharm64|webstorm64|rider64|clion64|goland64|phpstorm64|studio64|windowsterminal|wezterm-gui|alacritty|mintty|powershell|pwsh|cmd)$/.test(app)) return 'code';
   if (/^(slack|discord|whatsapp|telegram|teams|ms-teams|signal)$/.test(app)) return 'chat';
   if (/^(outlook|thunderbird)$/.test(app)) return 'email';
   try {
@@ -22,7 +27,8 @@ export function writingCategory(context: WindowContext): 'chat' | 'email' | 'cod
 }
 
 export function adaptPunctuation(text: string, context: WindowContext, settings: Pick<AppSettings,'contextAwarePunctuation'|'punctuationMode'|'writingStyle'>, vocabulary: {word:string}[] = []): string {
-  if (settings.contextAwarePunctuation === false || settings.writingStyle === 'code' || writingCategory(context) === 'code' || /\n|```|^[•*-]\s/.test(text)) return text;
+  // Technical tone only matters in code apps, which already keep text exactly as dictated.
+  if (settings.contextAwarePunctuation === false || writingCategory(context) === 'code' || /\n|```|^[•*-]\s/.test(text)) return text;
   let result = text;
   const mode = settings.punctuationMode || 'auto';
   if (mode === 'minimal' || mode === 'auto' && settings.writingStyle !== 'professional' && (writingCategory(context) === 'chat' || settings.writingStyle === 'casual')) {
