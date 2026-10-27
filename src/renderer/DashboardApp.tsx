@@ -838,7 +838,7 @@ export const DashboardApp: React.FC = () => {
       {/* Main Content Area */}
       <div className="main-content">
         {accessLocked?<AccountPrivacy onContinue={()=>setActiveTab('dictation')} onAdmin={()=>{}}/>:settings.setupCompleted===false && activeTab!=='account' && activeTab!=='admin'?<FirstRunSetup onChange={applySavedSettings} onDone={()=>setActiveTab('models')} onAccount={()=>setActiveTab('account')}/>:<>
-        {SETUP_PAGES.includes(activeTab) && <nav className="setup-steps" aria-label="Setup steps">
+        {(activeTab === 'setup' || SETUP_PAGES.includes(activeTab)) && <nav className="setup-steps" aria-label="Setup steps">
           {SETUP_STEPS.map((step, index) => {
             const current = activeTab === step.tab || (activeTab === 'admin' && step.tab === 'account');
             return <button key={step.tab} className={`setup-step${current ? ' current' : ''}`} aria-current={current ? 'step' : undefined} onClick={() => setActiveTab(step.tab)}>
@@ -1248,6 +1248,7 @@ export const DashboardApp: React.FC = () => {
               <label className="setup-row setup-toggle"><div><span className="setup-row-label">Recordings</span><span>Keep recordings for 7 days, then delete them</span></div><input type="checkbox" role="switch" checked={settings.retainAudio !== false} onChange={event => saveNow({ retainAudio: event.target.checked })}/></label>
               <div className="setup-row"><div><span className="setup-row-label">Account and privacy</span><span>{accountStatus?.user ? 'Signed in' : 'Guest · no usage data sent'}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('account')}>Open</button></div>
             </div>
+            <div className="setup-step-footer"><span className="muted">Go through each step, or change one setting above.</span><button className="btn btn-primary" onClick={() => setActiveTab('models')}><span>Start: Speech</span><ArrowRight size={16}/></button></div>
           </section>
         )}
 
