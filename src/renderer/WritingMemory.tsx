@@ -60,7 +60,7 @@ export function WritingMemory({ view }: {view:'preferences'|'vocabulary'}) {
           <button className="btn btn-secondary" disabled={busy} aria-label={`${'text' in item?'Delete rule':'Forget spelling'} ${'text' in item?item.text:item.word}`} onClick={()=>void ('text' in item?changePreference(item.id,true):run(()=>api.reviewLearnedWord(item.id,'forget')))}><Trash2 size={14}/>{'text' in item?'Delete':'Forget'}</button>
         </div>
       </div>)}
-      {(view==='preferences'?memory.preferences:memory.vocabulary).length===0 && <p className="muted">{view==='preferences'?'No writing rules saved yet.':'No learned spellings yet. Correct a recent dictation in the target app or in Dictation history to get started.'}</p>}
+      {(view==='preferences'?memory.preferences:memory.vocabulary).length===0 && <p className="muted">{view==='preferences'?'No writing rules saved yet.':'No learned spellings yet. Correct a recent dictation in the target app or on Home to get started.'}</p>}
     </div>
     {error && <p className="delivery-error" role="alert">{error}</p>}
   </section>;

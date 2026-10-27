@@ -36,6 +36,9 @@ import {
   Volume1,
   AlertTriangle,
   CheckCircle2,
+  ArrowLeft,
+  Home,
+  FlaskConical,
   Sun,
   Moon,
   Monitor,
@@ -59,9 +62,13 @@ import { DictationFlow } from './DictationFlow';
 import { LocalSpeechSettings } from './LocalSpeechSettings';
 import { FirstRunSetup, LocalSetupPanel } from './LocalSetup';
 import { OwlAvatar } from './OwlAvatar';
+import { BAR_DESIGNS } from '../shared/barDesigns';
 import owlioIcon from '../../assets/brand/owlio-icon.png';
 
-type DashboardTab = 'dictation' | 'notetaker' | 'insights' | 'dictionary' | 'snippets' | 'style' | 'scratchpad' | 'settings' | 'models' | 'text' | 'account' | 'admin';
+type DashboardTab = 'dictation' | 'words' | 'setup' | 'labs' | 'notetaker' | 'style' | 'settings' | 'models' | 'text' | 'account' | 'admin';
+const SETUP_PAGES: DashboardTab[] = ['models', 'text', 'style', 'settings', 'account', 'admin'];
+// Older links and tray actions may still name the retired pages.
+const TAB_ALIASES: Record<string, DashboardTab> = { dictionary: 'words', snippets: 'words', insights: 'dictation', scratchpad: 'dictation' };
 type SettingsSection = 'speech' | 'text' | 'general' | 'style';
 const SETTINGS_FIELDS: Record<SettingsSection, string[]> = {
   speech: ['localSttModel', 'provider', 'groqApiKey', 'localSttUrl', 'dictationLanguage'],
@@ -69,7 +76,7 @@ const SETTINGS_FIELDS: Record<SettingsSection, string[]> = {
   general: ['barDesign', 'microphoneDeviceId', 'hotkey', 'mode', 'retainAudio', 'startWithWindows'],
   style: ['writingStyle', 'geminiStructuredFormatting', 'contextAwarePunctuation', 'punctuationMode', 'autoLearnCorrections'],
 };
-const DASHBOARD_TABS: DashboardTab[] = ['dictation', 'notetaker', 'insights', 'dictionary', 'snippets', 'style', 'scratchpad', 'settings', 'models', 'text', 'account', 'admin'];
+const DASHBOARD_TABS: DashboardTab[] = ['dictation', 'words', 'setup', 'labs', 'notetaker', 'style', 'settings', 'models', 'text', 'account', 'admin'];
 
 export const DashboardApp: React.FC = () => {
   const [accountStatus,setAccountStatus]=useState<AccountStatus|null>(null);
@@ -133,6 +140,7 @@ export const DashboardApp: React.FC = () => {
     punctuationMode: 'auto',
     barDesign: 'owl',
     theme: 'system',
+    meetingNotesEnabled: false,
     setupCompleted: true,
     localSttUrl: 'http://localhost:8000/v1',
     localSttModel: 'base',
@@ -173,9 +181,6 @@ export const DashboardApp: React.FC = () => {
   const [newSnippetText, setNewSnippetText] = useState('');
   const [newSnippetDesc, setNewSnippetDesc] = useState('');
 
-  // Scratchpad state
-  const [scratchpadText, setScratchpadText] = useState('');
-  const [isScratchpadSaved, setIsScratchpadSaved] = useState(false);
 
   // Meeting Notetaker state
   const [isMeetingRecording, setIsMeetingRecording] = useState(false);
@@ -255,7 +260,8 @@ export const DashboardApp: React.FC = () => {
     const devicesChanged = () => { void loadAudioDevices(false); };
     navigator.mediaDevices.addEventListener('devicechange', devicesChanged);
     const cleanupNavigation = (window as any).api.onDashboardNavigate((tab: string) => {
-      if (DASHBOARD_TABS.includes(tab as DashboardTab)) setActiveTab(tab as DashboardTab);
+      const target = TAB_ALIASES[tab] || tab;
+      if (DASHBOARD_TABS.includes(target as DashboardTab)) setActiveTab(target as DashboardTab);
     });
     let disposed = false;
     const refreshDictation = async () => {
@@ -309,8 +315,6 @@ export const DashboardApp: React.FC = () => {
       const snips = await (window as any).api.getSnippets?.();
       snippetsRef.current = snips || [];
       setSnippets(snippetsRef.current);
-      const scratch = await (window as any).api.getScratchpad?.();
-      setScratchpadText(scratch || '');
       const meetings = await (window as any).api.getMeetings?.();
       setMeetingNotes(meetings || []);
     } catch (e) {
@@ -628,14 +632,6 @@ export const DashboardApp: React.FC = () => {
     try { await snippetsSaveRef.current; } catch (e) { setSaveError(e instanceof Error ? e.message : 'Snippets could not be saved.'); await loadAll(); }
   };
 
-  const handleSaveScratchpad = async () => {
-    try {
-      await (window as any).api.setScratchpad?.(scratchpadText);
-      setSaveError(''); setIsScratchpadSaved(true);
-      setTimeout(() => setIsScratchpadSaved(false), 2000);
-    } catch (e) { setSaveError(e instanceof Error ? e.message : 'Scratchpad could not be saved.'); }
-  };
-
   const handleCopyHistory = async (text: string, id: string) => {
     try {
       await (window as any).api.copyText(text);
@@ -758,16 +754,30 @@ export const DashboardApp: React.FC = () => {
   let streak = 0;
   const day = new Date();
   while (activeDays.has(day.toDateString())) { streak += 1; day.setDate(day.getDate() - 1); }
-  const appCounts = history.reduce<Record<string, number>>((counts, item) => {
-    const app = item.processName || 'Unknown'; counts[app] = (counts[app] || 0) + 1; return counts;
-  }, {});
-  const topApps = Object.entries(appCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
-
+  const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const weekWords = history.filter(item => item.timestamp >= weekStart).reduce((acc, item) => acc + (item.wordCount || (item.formattedText || '').trim().split(/\s+/).filter(Boolean).length), 0);
+  const hoursSaved = totalRecordedWords / 40 / 60;
   const filteredHistory = history.filter(
     (item) =>
       (item.formattedText || '').toLowerCase().includes(searchHistory.toLowerCase()) ||
       (item.processName || '').toLowerCase().includes(searchHistory.toLowerCase())
   );
+  const dayLabel = (timestamp: number) => {
+    const date = new Date(timestamp), today = new Date(), yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' });
+  };
+  const historyGroups = filteredHistory.reduce<{ label: string; items: typeof filteredHistory }[]>((groups, item) => {
+    const label = dayLabel(item.timestamp), last = groups[groups.length - 1];
+    if (last?.label === label) last.items.push(item); else groups.push({ label, items: [item] });
+    return groups;
+  }, []);
+  const saveNow = (patch: Record<string, unknown>) => {
+    applySavedSettings(patch);
+    void (window as any).api.updateSettings(patch).catch((error: Error) => setSaveError(error.message));
+  };
   const microphoneName = audioDevices.find(device => device.deviceId === settings.microphoneDeviceId)?.label || 'System default';
   const speechModelName = settings.provider === 'local'
     ? speechModelLabel(settings.localSttModel || 'base')
@@ -789,70 +799,13 @@ export const DashboardApp: React.FC = () => {
         </div>
 
         <nav className="nav-menu" aria-label="Main navigation">
-          <div className="nav-group-label">Workspace</div>
-          <button
-            className={`nav-item ${activeTab === 'dictation' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dictation')}
-          >
-            <Mic size={18} />
-            <span>Dictation</span>
+          <button className={`nav-item ${activeTab === 'dictation' ? 'active' : ''}`} aria-current={activeTab === 'dictation' ? 'page' : undefined} onClick={() => setActiveTab('dictation')}><Home size={18}/><span>Home</span></button>
+          <button className={`nav-item ${activeTab === 'words' ? 'active' : ''}`} aria-current={activeTab === 'words' ? 'page' : undefined} onClick={() => setActiveTab('words')}><BookA size={18}/><span>Word book</span></button>
+          <button className={`nav-item ${activeTab === 'setup' || SETUP_PAGES.includes(activeTab) ? 'active' : ''}`} aria-current={activeTab === 'setup' || SETUP_PAGES.includes(activeTab) ? 'page' : undefined} onClick={() => setActiveTab('setup')}>
+            <SettingsIcon size={18}/><span>Setup</span>{(['speech', 'text', 'general', 'style'] as SettingsSection[]).some(sectionDirty) && <span className="draft-dot" aria-label="Unsaved setup changes"/>}
           </button>
-
-          <button
-            className={`nav-item ${activeTab === 'notetaker' ? 'active' : ''}`}
-            onClick={() => setActiveTab('notetaker')}
-          >
-            <Users size={18} />
-            <span>Notetaker</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'insights' ? 'active' : ''}`}
-            onClick={() => setActiveTab('insights')}
-          >
-            <BarChart3 size={18} />
-            <span>Insights</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'dictionary' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dictionary')}
-          >
-            <BookA size={18} />
-            <span>Dictionary</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'snippets' ? 'active' : ''}`}
-            onClick={() => setActiveTab('snippets')}
-          >
-            <Scissors size={18} />
-            <span>Snippets</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'scratchpad' ? 'active' : ''}`}
-            onClick={() => setActiveTab('scratchpad')}
-          >
-            <FileText size={18} />
-            <span>Scratchpad</span>
-          </button>
-
-          <div className="nav-group-label configure-label">Configure</div>
-          <button className={`nav-item ${activeTab === 'account' || activeTab === 'admin' ? 'active' : ''}`} aria-current={activeTab === 'account' || activeTab === 'admin' ? 'page' : undefined} onClick={() => setActiveTab('account')}><ShieldCheck size={18}/><span>Account &amp; privacy</span></button>
-          <button className={`nav-item ${activeTab === 'models' ? 'active' : ''}`} aria-current={activeTab === 'models' ? 'page' : undefined} onClick={() => setActiveTab('models')}>
-            <Cpu size={18}/><span>Speech &amp; models</span>{sectionDirty('speech') && <span className="draft-dot" aria-label="Unsaved speech changes"/>}
-          </button>
-          <button className={`nav-item ${activeTab === 'text' || activeTab === 'style' ? 'active' : ''}`} aria-current={activeTab === 'text' || activeTab === 'style' ? 'page' : undefined} onClick={() => setActiveTab('text')}>
-            <Type size={18}/><span>Text &amp; style</span>{(sectionDirty('text') || sectionDirty('style')) && <span className="draft-dot" aria-label="Unsaved text changes"/>}
-          </button>
-          <button
-            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            <SettingsIcon size={18} />
-            <span>General settings</span>{sectionDirty('general') && <span className="draft-dot" aria-label="Unsaved general changes"/>}
-          </button>
+          <button className={`nav-item ${activeTab === 'labs' ? 'active' : ''}`} aria-current={activeTab === 'labs' ? 'page' : undefined} onClick={() => setActiveTab('labs')}><FlaskConical size={18}/><span>Labs</span></button>
+          {settings.meetingNotesEnabled && <button className={`nav-item nav-sub-item ${activeTab === 'notetaker' ? 'active' : ''}`} aria-current={activeTab === 'notetaker' ? 'page' : undefined} onClick={() => setActiveTab('notetaker')}><Users size={16}/><span>Meeting notes</span></button>}
         </nav>
 
         <div style={{ marginTop: 'auto', padding: '12px 8px' }}>
@@ -876,6 +829,7 @@ export const DashboardApp: React.FC = () => {
       {/* Main Content Area */}
       <div className="main-content">
         {accessLocked?<AccountPrivacy onContinue={()=>setActiveTab('dictation')} onAdmin={()=>{}}/>:settings.setupCompleted===false && activeTab!=='account' && activeTab!=='admin'?<FirstRunSetup onChange={applySavedSettings} onDone={()=>setActiveTab('models')} onAccount={()=>setActiveTab('account')}/>:<>
+        {SETUP_PAGES.includes(activeTab) && <button className="back-link" onClick={() => setActiveTab('setup')}><ArrowLeft size={14}/><span>Setup</span></button>}
         {activeTab==='account' && <AccountPrivacy onContinue={()=>setActiveTab('dictation')} onAdmin={()=>setActiveTab('admin')}/>}
         {activeTab==='admin' && <AdminDashboard onBack={()=>setActiveTab('account')}/>}
         {saveError && (
@@ -889,9 +843,6 @@ export const DashboardApp: React.FC = () => {
               <div className="header-row">
                 <div>
                   <h1 className="page-title">Your voice workspace</h1>
-                  <p style={{ color: 'var(--c-746f6b)', fontSize: '14px', marginTop: '4px' }}>
-                    {settings.mode === 'toggle' ? 'Press' : 'Hold'} {settings.hotkey} to dictate into your selected text field.
-                  </p>
                 </div>
               </div>
 
@@ -912,6 +863,7 @@ export const DashboardApp: React.FC = () => {
                 </div>
                 <span className="owl-status-badge">Ready</span>
               </div>
+              <p className="home-stats"><span><strong>{weekWords.toLocaleString()}</strong> words this week</span><span><strong>{hoursSaved >= 1 ? `${hoursSaved.toFixed(1)} h` : `${Math.round(hoursSaved * 60)} min`}</strong> saved</span><span><strong>{streak}</strong>-day streak</span>{averageWpm > 0 && <span><strong>{averageWpm}</strong> WPM</span>}</p>
 
               <div className="history-toolbar" role="group" aria-label="History controls">
                 <input
@@ -936,7 +888,7 @@ export const DashboardApp: React.FC = () => {
                     </p>
                   </div>
                 ) : (
-                  filteredHistory.map((item) => (
+                  historyGroups.map(group => <section key={group.label} className="history-day" aria-label={group.label}><h3 className="history-day-label">{group.label}</h3>{group.items.map((item) => (
                     <div key={item.id} className="history-item">
                       <div className="history-meta">
                         <span className="app-badge">{item.processName || 'Window'}</span>
@@ -982,49 +934,11 @@ export const DashboardApp: React.FC = () => {
                       <HistoryCorrection item={item}/>
                       {item.warning && <p className="muted">{item.warning}</p>}
                     </div>
-                  ))
+                  ))}</section>)
                 )}
               </div>
             </div>
 
-            <aside className="dictation-summary" aria-label="Activity and current setup" tabIndex={0}>
-              <section className="card activity-card" aria-labelledby="activity-heading">
-                <div className="summary-card-heading"><h2 id="activity-heading">Activity</h2><span>All time</span></div>
-                <dl className="activity-metrics">
-                  <div><dt>Total words</dt><dd>{totalRecordedWords.toLocaleString()}</dd></div>
-                  <div><dt>Average WPM</dt><dd>{averageWpm || '—'}</dd></div>
-                </dl>
-                <div className="activity-streak"><Flame size={16}/><span>{streak ? `${streak} day${streak === 1 ? '' : 's'} in a row` : 'Start a streak today'}</span></div>
-              </section>
-
-              <section className={`card current-setup${setupExpanded ? ' expanded' : ''}`} aria-labelledby="current-setup-heading">
-                <div className="summary-card-heading"><h2 id="current-setup-heading">Current setup</h2><button className="setup-expand" aria-label={setupExpanded ? 'Hide setup details' : 'Show setup details'} aria-expanded={setupExpanded} aria-controls="setup-summary-details" onClick={()=>setSetupExpanded(previous=>!previous)}><ChevronDown size={16}/></button></div>
-                <div className="setup-mode"><Zap size={14}/>{settings.provider === 'local' ? 'Local speech'  : 'Cloud speech'}</div>
-                <p className="setup-compact-value">{speechModelName} · {outputScript}</p>
-                <dl className="setup-summary-list" id="setup-summary-details">
-                  <div className="setup-summary-row">
-                    <dt><Cpu size={15}/>Speech recognition</dt>
-                    <dd><span>{speechModelName}</span>
-                      <p>{settings.provider === 'local' ? 'Audio processed on this computer'  : 'Audio sent to your speech provider'}</p>
-                      <button className="setup-change" aria-label="Change speech model" onClick={()=>setActiveTab('models')}>Change<ArrowUpRight size={13}/></button>
-                    </dd>
-                  </div>
-                  <div className="setup-summary-row">
-                    <dt><Mic size={15}/>Microphone</dt>
-                    <dd><span>{microphoneName}</span>
-                      <button className="setup-change" aria-label="Change microphone" onClick={()=>setActiveTab('settings')}>Change<ArrowUpRight size={13}/></button>
-                    </dd>
-                  </div>
-                  <div className="setup-summary-row">
-                    <dt><Type size={15}/>Text output</dt>
-                    <dd><span>{outputScript}</span>
-                      <p>{cleanupName}</p>
-                      <button className="setup-change" aria-label="Change text output" onClick={()=>setActiveTab('text')}>Change<ArrowUpRight size={13}/></button>
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-            </aside>
             </div>
           </section>
         )}
@@ -1149,62 +1063,20 @@ export const DashboardApp: React.FC = () => {
           </>
         )}
 
-        {/* ================= INSIGHTS TAB ================= */}
-        {activeTab === 'insights' && (
+        {/* ================= WORD BOOK ================= */}
+        {activeTab === 'words' && (
           <>
             <div className="header-row">
               <div>
-                <h1 className="page-title">Voice Insights</h1>
+                <h1 className="page-title">Word book</h1>
                 <p style={{ color: 'var(--c-746f6b)', fontSize: '14px', marginTop: '4px' }}>
-                  Analytics on your dictation volume, speaking speed, and top applications.
+                  Spellings Owlio should get right, and shortcuts it expands.
                 </p>
               </div>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-              <div className="card">
-                <div style={{ fontSize: '13px', color: 'var(--c-746f6b)' }}>Total Dictated Words</div>
-                <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--c-292627)', marginTop: '6px' }}>
-                  {totalRecordedWords.toLocaleString()}
-                </div>
-              </div>
-              <div className="card">
-                <div style={{ fontSize: '13px', color: 'var(--c-746f6b)' }}>Average Speaking Speed</div>
-                <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--c-396f68)', marginTop: '6px' }}>
-                  {averageWpm} <span style={{ fontSize: '14px', color: 'var(--c-746f6b)' }}>WPM</span>
-                </div>
-              </div>
-              <div className="card">
-                <div style={{ fontSize: '13px', color: 'var(--c-746f6b)' }}>Typing Time Saved</div>
-                <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--c-36754c)', marginTop: '6px' }}>
-                  {(totalRecordedWords / 40 / 60).toFixed(1)} <span style={{ fontSize: '14px', color: 'var(--c-746f6b)' }}>Hours</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Top Applications Dictated Into</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
-                 {topApps.length === 0 ? <p style={{ color: 'var(--c-746f6b)' }}>No application data yet.</p> : topApps.map(([app, count]) => (
-                   <div key={app} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                     <span style={{ fontSize: '14px', color: 'var(--c-292627)' }}>{app}</span>
-                     <span className="app-badge">{count} dictation{count === 1 ? '' : 's'}</span>
-                   </div>
-                 ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ================= DICTIONARY TAB ================= */}
-        {activeTab === 'dictionary' && (
-          <>
-            <div className="header-row">
+            <div className="header-row word-book-section">
               <div>
-                <h1 className="page-title">Custom Vocabulary</h1>
-                <p style={{ color: 'var(--c-746f6b)', fontSize: '14px', marginTop: '4px' }}>
-                  Define custom names, Hinglish phrases, acronyms, and automatic text replacements.
-                </p>
+                <h2 className="section-title">Spellings</h2>
               </div>
             </div>
 
@@ -1254,20 +1126,20 @@ export const DashboardApp: React.FC = () => {
           </>
         )}
 
-        {/* ================= SNIPPETS TAB ================= */}
-        {activeTab === 'snippets' && (
+        {/* ================= WORD BOOK SHORTCUTS ================= */}
+        {activeTab === 'words' && (
           <>
             <div className="header-row">
               <div>
-                <h1 className="page-title">Snippets</h1>
+                <h2 className="section-title">Shortcuts</h2>
                 <p style={{ color: 'var(--c-746f6b)', fontSize: '14px', marginTop: '4px' }}>
-                  Expand voice trigger words into entire templated messages automatically.
+                  Say a trigger phrase and Owlio types the full text.
                 </p>
               </div>
             </div>
 
             <div className="card">
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Add New Snippet</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Add shortcut</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
                 <input
                   type="text"
@@ -1293,7 +1165,7 @@ export const DashboardApp: React.FC = () => {
               />
               <button className="btn btn-primary" style={{ marginTop: '10px' }} onClick={handleAddSnippet}>
                 <Plus size={16} />
-                <span>Add snippet</span>
+                <span>Add shortcut</span>
               </button>
             </div>
 
@@ -1349,37 +1221,38 @@ export const DashboardApp: React.FC = () => {
           </section>
         )}
 
-        {/* ================= SCRATCHPAD TAB ================= */}
-        {activeTab === 'scratchpad' && (
-          <>
-            <div className="header-row">
-              <div>
-                <h1 className="page-title">Scratchpad</h1>
-                <p style={{ color: 'var(--c-746f6b)', fontSize: '14px', marginTop: '4px' }}>
-                  A place for ideas, notes and drafts. Select Save draft to keep your text.
-                </p>
-              </div>
-              <button className="btn btn-primary" onClick={handleSaveScratchpad}>
-                {isScratchpadSaved ? <Check size={16} /> : <FileText size={16} />}
-                <span>{isScratchpadSaved ? 'Saved!' : 'Save draft'}</span>
-              </button>
+        {/* ================= SETUP ================= */}
+        {activeTab === 'setup' && (
+          <section className="setup-page" aria-label="Setup">
+            <div className="header-row"><div><h1 className="page-title">Setup</h1><p className="page-description">Everything Owlio needs, on one page.</p></div></div>
+            <div className="card setup-list">
+              <div className="setup-row"><div><span className="setup-row-label">Speech</span><span>{speechModelName} · {settings.provider === 'local' ? 'on this computer' : 'cloud'}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('models')}>Change</button></div>
+              <div className="setup-row"><div><span className="setup-row-label">Language</span><span>{languageName(settings.dictationLanguage)}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('models')}>Change</button></div>
+              <div className="setup-row"><div><span className="setup-row-label">Text</span><span>{settings.formattingProvider === 'basic' ? 'Basic punctuation' : `AI cleanup with ${writingProvider(settings) === 'gemini' ? 'Gemini' : 'Ollama'}`}{settings.romanizationProvider === 'gemini' && usesHindiConversion(settings.dictationLanguage) ? ' · Roman Hinglish' : ''}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('text')}>Change</button></div>
+              <div className="setup-row"><div><span className="setup-row-label">Writing style</span><span>{({ auto: 'Automatic', casual: 'Casual', professional: 'Professional', code: 'Code' } as Record<string, string>)[settings.writingStyle] || 'Automatic'}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('style')}>Change</button></div>
+              <div className="setup-row"><div><span className="setup-row-label">Shortcut and microphone</span><span>{settings.mode === 'toggle' ? 'Press' : 'Hold'} {settings.hotkey} · {microphoneName}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('settings')}>Change</button></div>
+              <div className="setup-row"><div><span className="setup-row-label">Companion</span><span>{BAR_DESIGNS.find(item => item.id === settings.barDesign)?.name || 'Owl'}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('settings')}>Change</button></div>
+              <label className="setup-row setup-toggle"><div><span className="setup-row-label">Recordings</span><span>Keep recordings for 7 days, then delete them</span></div><input type="checkbox" role="switch" checked={settings.retainAudio !== false} onChange={event => saveNow({ retainAudio: event.target.checked })}/></label>
+              <div className="setup-row"><div><span className="setup-row-label">Account and privacy</span><span>{accountStatus?.user ? 'Signed in' : 'Guest · no usage data sent'}</span></div><button className="btn btn-secondary" onClick={() => setActiveTab('account')}>Open</button></div>
             </div>
+          </section>
+        )}
 
-            <textarea
-              className="input"
-              style={{
-                width: '100%',
-                height: '420px',
-                fontSize: '15px',
-                lineHeight: 1.6,
-                padding: '16px',
-                resize: 'vertical',
-              }}
-              value={scratchpadText}
-              onChange={(e) => setScratchpadText(e.target.value)}
-              placeholder={`Click here to type, or ${settings.mode === 'toggle' ? 'press' : 'hold'} ${settings.hotkey || 'your shortcut'} to dictate…`}
-            />
-          </>
+        {/* ================= LABS ================= */}
+        {activeTab === 'labs' && (
+          <section className="labs-page" aria-label="Labs">
+            <div className="header-row"><div><h1 className="page-title">Labs</h1><p className="page-description">Extra features, off by default. Turn on what you need.</p></div></div>
+            <div className="card labs-card">
+              <Users size={20} aria-hidden="true"/>
+              <div><h3>Meeting notes</h3><p className="muted">Record a meeting and get a transcript and summary.</p>{settings.meetingNotesEnabled && <button className="btn btn-secondary" onClick={() => setActiveTab('notetaker')}>Open meeting notes</button>}</div>
+              <input type="checkbox" role="switch" aria-label="Meeting notes" checked={!!settings.meetingNotesEnabled} onChange={event => saveNow({ meetingNotesEnabled: event.target.checked })}/>
+            </div>
+            <div className="card labs-card">
+              <Sparkles size={20} aria-hidden="true"/>
+              <div><h3>Voice rewrites</h3><p className="muted">Select text and say how to change it. Needs a Writing AI (Gemini or Ollama).</p><button className="btn btn-secondary" onClick={() => setActiveTab('text')}>{settings.instructModeEnabled ? 'Change' : 'Set up'}</button></div>
+              <span className={`labs-state${settings.instructModeEnabled ? ' on' : ''}`}>{settings.instructModeEnabled ? 'On' : 'Off'}</span>
+            </div>
+          </section>
         )}
 
         {/* ================= SPEECH & MODELS ================= */}

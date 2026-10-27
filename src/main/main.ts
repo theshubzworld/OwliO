@@ -368,6 +368,7 @@ function setupHelperListeners() {
 app.whenReady().then(() => {
   if (!ownsInstance) return;
   nativeTheme.themeSource = store.getSettings().theme;
+  try { store.pruneExpiredAudio(); } catch (error) { console.warn('Could not remove expired recordings:', error); }
   startCloudServices(()=>{
     finishSession({state:'idle'});helperBridge.cancelPaste();meetingProcessing?.abort();dictationRecovery?.abort();
     if(activeMeetingCapture){const id=activeMeetingCapture;activeMeetingCapture=undefined;void meetingCaptures.failed(id).catch(()=>{});}

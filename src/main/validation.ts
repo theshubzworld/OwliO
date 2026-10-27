@@ -66,6 +66,7 @@ export function validateSettings(value: unknown): AppSettings {
     retainAudio: boolean(s.retainAudio),
     startWithWindows: boolean(s.startWithWindows ?? false),
     theme: choice(s.theme ?? 'system', ['system', 'light', 'dark']),
+    meetingNotesEnabled: boolean(s.meetingNotesEnabled ?? false),
   };
 }
 
