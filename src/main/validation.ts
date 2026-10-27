@@ -65,6 +65,7 @@ export function validateSettings(value: unknown): AppSettings {
     dictationLanguage: choice(s.dictationLanguage, SPEECH_LANGUAGE_CODES),
     retainAudio: boolean(s.retainAudio),
     startWithWindows: boolean(s.startWithWindows ?? false),
+    theme: choice(s.theme ?? 'system', ['system', 'light', 'dark']),
   };
 }
 

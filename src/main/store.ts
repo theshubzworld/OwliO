@@ -41,6 +41,7 @@ export interface AppSettings {
   dictationLanguage: string; // Whisper language code, Hinglish, or automatic detection
   retainAudio: boolean;
   startWithWindows: boolean;
+  theme: 'system' | 'light' | 'dark';
 }
 
 export interface DictionaryItem {
@@ -130,6 +131,7 @@ const DEFAULT_DATA: AppData = {
     dictationLanguage: 'en',
     retainAudio: true,
     startWithWindows: false,
+    theme: 'system',
   },
   dictionary: [
     { id: '1', from: 'whisper', to: 'Whisper' },
