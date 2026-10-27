@@ -1,7 +1,7 @@
 import { store } from './store';
 import { formatWithGemini, generateText } from './geminiFormatting';
 import { hasHindiText, romanizeWithGemini } from './geminiRomanization';
-import { adaptPunctuation, matchingPreferences, preferredVocabulary, writingCategory } from './writingMemory';
+import { adaptPunctuation, learnedSpellings, matchingPreferences, preferredVocabulary, writingCategory } from './writingMemory';
 import { usesHindiConversion, usesLatinScript } from '../shared/speechLanguages';
 import { writingProvider } from '../shared/writingConfig';
 import { requestSignal } from './requestSignal';
@@ -147,7 +147,8 @@ export async function processAudioDictation(
     } else if (writingProvider(settings) === 'gemini') {
       try {
         formattedText = await measure('cleanup',()=>formatWithGemini(cleanupText, {
-          key: settings.geminiApiKey, style: settings.writingStyle,
+          // Technical applies to code apps only; elsewhere Gemini uses the natural tone.
+          key: settings.geminiApiKey, style: settings.writingStyle === 'code' && writingCategory(context) !== 'code' ? 'auto' : settings.writingStyle,
           structured: settings.geminiStructuredFormatting,
           signal: options.signal,
           vocabulary, preferences, category: writingCategory(context),
@@ -163,7 +164,8 @@ export async function processAudioDictation(
     }
   }
 
-  // 4. Apply Custom Dictionary / Replacements
+  // 4. Apply learned spellings, then Word book spellings (which win when both match).
+  if (!isInstruct) formattedText = applyDictionary(formattedText, learnedSpellings(store.getLearnedVocabulary?.() || []));
   formattedText = applyDictionary(formattedText, dictionary);
 
   if (!isInstruct) {
@@ -396,7 +398,7 @@ export function cleanSpeechDisfluencies(text: string): string {
 export function localFormat(rawText: string, context: WindowContext): string {
   let cleaned = cleanSpeechDisfluencies(rawText);
   if (!cleaned) return '';
-  if (store.getSettings().writingStyle === 'code' || writingCategory(context) === 'code') return cleaned;
+  if (writingCategory(context) === 'code') return cleaned;
   cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   if (!/[.!?।]$/.test(cleaned)) {
     cleaned += '.';

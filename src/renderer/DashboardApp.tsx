@@ -1226,10 +1226,11 @@ export const DashboardApp: React.FC = () => {
             <section className="card writing-learning" aria-label="Correction learning">
               <h3>Correction learning</h3>
               <label className="structure-toggle"><input type="checkbox" checked={settings.autoLearnCorrections !== false} onChange={event=>setSettings((previous:any)=>({...previous,autoLearnCorrections:event.target.checked}))}/>Learn spellings from my corrections</label>
-              <p className="muted">Learn spellings from corrections to recent dictations. Review suggestions in Dictionary.</p>
+              <p className="muted">Learn spellings from corrections to recent dictations. Review suggestions in Word book. Accepted spellings fix future dictations, with or without Gemini.</p>
               <details className="settings-disclosure"><summary>How learning works</summary><p className="muted">Owlio checks the same focused field for up to 30 seconds after pasting. With Gemini Writing AI configured, changed spelling candidates are sent for review. Password fields are excluded. You can also use “Correct this dictation” in History.</p></details>
             </section>
 
+            {writingProvider(settings) !== 'gemini' || settings.formattingProvider === 'basic' ? <p className="muted"><span className="needs-gemini">Needs Gemini</span> Writing rules are applied by Gemini cleanup.</p> : null}
             <WritingMemory view="preferences"/>
             </details>
           </section>
