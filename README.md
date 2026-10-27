@@ -62,7 +62,7 @@ It runs **local speech models (Whisper, Bodhan Flex and Parakeet TDT)** on your 
 - 🌍 **Over 100 Languages**: Automatic language detection across global languages (English, Spanish, French, German, Japanese, Mandarin, Arabic, and more), plus 27 regional Indic dialects and bilingual Hinglish.
 - 🦉 **Your Companion, Your Way**: Customise your floating desk companion with multiple styles: Owl, Sleepy Cat, Little Cloud, Friendly Robot, Minimal Waveform, or Glowing Pebble.
 - ✍️ **Intelligent AI Polish**: Keep pure verbatim speech with basic punctuation, or enable optional AI cleanup (via Gemini or Ollama) for smart formatting, disfluency removal, voice rewrites, and meeting summaries.
-- 📝 **Scratchpad & Meeting Notetaker**: Long-form dictation recording, searchable history, local audio playback, and custom snippet triggers.
+- 📝 **Word book & Labs**: Teach Owlio your spellings and spoken shortcuts, browse your dictations by day, and turn on extras like meeting notes and voice rewrites in Labs.
 
 ---
 
