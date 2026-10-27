@@ -36,6 +36,7 @@ import {
   Volume1,
   AlertTriangle,
   CheckCircle2,
+  ArrowRight,
   ArrowLeft,
   Home,
   FlaskConical,
@@ -67,6 +68,14 @@ import owlioIcon from '../../assets/brand/owlio-icon.png';
 
 type DashboardTab = 'dictation' | 'words' | 'setup' | 'labs' | 'notetaker' | 'style' | 'settings' | 'models' | 'text' | 'account' | 'admin';
 const SETUP_PAGES: DashboardTab[] = ['models', 'text', 'style', 'settings', 'account', 'admin'];
+// Setup steps run in this order; each can also be opened directly.
+const SETUP_STEPS: { tab: DashboardTab; label: string; hint: string; section?: SettingsSection }[] = [
+  { tab: 'models', label: 'Speech', hint: 'Model and where it runs', section: 'speech' },
+  { tab: 'text', label: 'Text', hint: 'Cleanup and script', section: 'text' },
+  { tab: 'style', label: 'Style', hint: 'Tone and rules', section: 'style' },
+  { tab: 'settings', label: 'Shortcut', hint: 'Key, microphone and more', section: 'general' },
+  { tab: 'account', label: 'Account', hint: 'Guest or sign in' },
+];
 // Older links and tray actions may still name the retired pages.
 const TAB_ALIASES: Record<string, DashboardTab> = { dictionary: 'words', snippets: 'words', insights: 'dictation', scratchpad: 'dictation' };
 type SettingsSection = 'speech' | 'text' | 'general' | 'style';
@@ -829,7 +838,15 @@ export const DashboardApp: React.FC = () => {
       {/* Main Content Area */}
       <div className="main-content">
         {accessLocked?<AccountPrivacy onContinue={()=>setActiveTab('dictation')} onAdmin={()=>{}}/>:settings.setupCompleted===false && activeTab!=='account' && activeTab!=='admin'?<FirstRunSetup onChange={applySavedSettings} onDone={()=>setActiveTab('models')} onAccount={()=>setActiveTab('account')}/>:<>
-        {SETUP_PAGES.includes(activeTab) && <button className="back-link" onClick={() => setActiveTab('setup')}><ArrowLeft size={14}/><span>Setup</span></button>}
+        {SETUP_PAGES.includes(activeTab) && <nav className="setup-steps" aria-label="Setup steps">
+          {SETUP_STEPS.map((step, index) => {
+            const current = activeTab === step.tab || (activeTab === 'admin' && step.tab === 'account');
+            return <button key={step.tab} className={`setup-step${current ? ' current' : ''}`} aria-current={current ? 'step' : undefined} onClick={() => setActiveTab(step.tab)}>
+              <span className="setup-step-name">{index + 1}. {step.label}{step.section && sectionDirty(step.section) && <span className="draft-dot" aria-label="Unsaved changes"/>}</span>
+              <span className="setup-step-hint">{step.hint}</span>
+            </button>;
+          })}
+        </nav>}
         {activeTab==='account' && <AccountPrivacy onContinue={()=>setActiveTab('dictation')} onAdmin={()=>setActiveTab('admin')}/>}
         {activeTab==='admin' && <AdminDashboard onBack={()=>setActiveTab('account')}/>}
         {saveError && (
@@ -1195,7 +1212,7 @@ export const DashboardApp: React.FC = () => {
           <section className="style-page" aria-label="Writing style">
             <div className="header-row">
               <div>
-                <h1 className="page-title">Text &amp; style</h1>
+                <h1 className="page-title">Writing style</h1>
                 <p style={{ color: 'var(--c-746f6b)', fontSize: '14px', marginTop: '4px' }}>
                   Your writing tone, smart lists, punctuation and personal rules.
                 </p>
@@ -1203,10 +1220,6 @@ export const DashboardApp: React.FC = () => {
               {saveButton('style')}
             </div>
 
-            <div className="settings-subnav" aria-label="Text settings views">
-              <button onClick={()=>setActiveTab('text')}>Output &amp; cleanup{sectionDirty('text') && <span className="draft-dot" aria-label="Unsaved output changes"/>}</button>
-              <button className="selected" aria-current="page" onClick={()=>setActiveTab('style')}>Writing style</button>
-            </div>
             <StyleSettings settings={settings} onChange={patch=>setSettings((previous:any)=>({...previous,...patch}))} onOpenSettings={()=>setActiveTab('text')}/>
             <details className="settings-disclosure settings-advanced"><summary>Advanced writing preferences<span>Correction learning and custom rules</span></summary>
             <section className="card writing-learning" aria-label="Correction learning">
@@ -1363,21 +1376,14 @@ export const DashboardApp: React.FC = () => {
             {settings.provider === 'local' && <LocalSpeechSettings settings={settings} currentModel={savedSettings?.localSttModel} onChange={patch=>{if(patch.localSttModel!==undefined)setLanguageModelNotice('');setSettings((previous:any)=>({...previous,...patch}));}} onConnected={syncSetupSettings} onOpenWizard={()=>{
               void(window as any).api.updateSettings({setupCompleted:false}).then(()=>setSettings((previous:any)=>({...previous,setupCompleted:false}))).catch((error:Error)=>setSaveError(error.message));
             }}/>}
-            <button className="btn btn-secondary style-link" onClick={()=>setActiveTab('text')}>Choose text output &amp; cleanup →</button>
           </section>
         )}
 
         {/* ================= TEXT OUTPUT ================= */}
         {activeTab === 'text' && (
           <section className="settings-page text-page" aria-label="Text output and cleanup">
-            <div className="header-row"><div><h1 className="page-title">Text &amp; style</h1><p className="page-description">Choose the script, cleanup and writing behavior of your pasted text.</p></div>{saveButton('text')}</div>
-            <div className="settings-subnav" aria-label="Text settings views">
-              <button className="selected" aria-current="page" onClick={()=>setActiveTab('text')}>Output &amp; cleanup</button>
-              <button onClick={()=>setActiveTab('style')}>Writing style{sectionDirty('style') && <span className="draft-dot" aria-label="Unsaved writing style changes"/>}</button>
-            </div>
-            <DictationFlow settings={settings}/>
+            <div className="header-row"><div><h1 className="page-title">Text output</h1><p className="page-description">Choose the script and cleanup of your pasted text.</p></div>{saveButton('text')}</div>
             <WritingSettings settings={settings} onChange={patch=>setSettings((previous:any)=>({...previous,...patch}))}/>
-            <button className="btn btn-secondary style-link" onClick={()=>setActiveTab('style')}>Writing style →</button>
             <p className="settings-save-note">Use <strong>Save settings</strong> to apply all pending settings.</p>
           </section>
         )}
@@ -1385,7 +1391,7 @@ export const DashboardApp: React.FC = () => {
         {/* ================= GENERAL SETTINGS ================= */}
         {activeTab === 'settings' && (
           <section className="settings-page" aria-label="General settings">
-            <div className="header-row"><div><h1 className="page-title">General settings</h1><p className="page-description">Your microphone, shortcuts, floating bar and recording history.</p></div>{saveButton('general')}</div>
+            <div className="header-row"><div><h1 className="page-title">Shortcut and more</h1><p className="page-description">Your shortcut, microphone, floating bar and recordings.</p></div>{saveButton('general')}</div>
             <p className="settings-save-note"><strong>Save settings</strong> applies all pending settings.</p>
             <section className="card" aria-labelledby="startup-heading">
               <h3 id="startup-heading" style={{ fontSize: '16px', fontWeight: 600 }}>Startup</h3>
@@ -1683,11 +1689,20 @@ export const DashboardApp: React.FC = () => {
                 <input type="checkbox" checked={settings.retainAudio !== false} onChange={(e) => setSettings({ ...settings, retainAudio: e.target.checked })} />
                 Save audio recordings
               </label>
-              <p style={{ fontSize: '12px', color: 'var(--c-746f6b)', marginTop: '6px' }}>Keep new recordings for playback in History. Turn off to save transcripts only.</p>
+              <p style={{ fontSize: '12px', color: 'var(--c-746f6b)', marginTop: '6px' }}>Keep recordings for 7 days for playback on Home, then delete them. Turn off to keep transcripts only.</p>
             </div>
             <PrivacySettings/>
           </section>
         )}
+        {SETUP_PAGES.includes(activeTab) && (() => {
+          const index = SETUP_STEPS.findIndex(step => step.tab === (activeTab === 'admin' ? 'account' : activeTab));
+          const previous = SETUP_STEPS[index - 1], next = SETUP_STEPS[index + 1];
+          return <div className="setup-step-footer">
+            {previous ? <button className="btn btn-secondary" onClick={() => setActiveTab(previous.tab)}><ArrowLeft size={16}/><span>{previous.label}</span></button> : <span/>}
+            {next ? <button className="btn btn-primary" onClick={() => setActiveTab(next.tab)}><span>Next: {next.label}</span><ArrowRight size={16}/></button>
+              : <button className="btn btn-primary" onClick={() => setActiveTab('setup')}><Check size={16}/><span>Done</span></button>}
+          </div>;
+        })()}
         </>}
       </div>
     </div>
