@@ -656,7 +656,7 @@ app.whenReady().then(() => {
       throw new Error('Model loading timed out. Check the speech server before trying again.');
     } finally { switchingModel = false; }
   });
-  ipcMain.handle('import-speech-model', (_event, url) => {requireAccountAccess();return importSpeechModel(url);});
+  ipcMain.handle('import-speech-model', (_event, url, token) => {requireAccountAccess();return importSpeechModel(url, token);});
   ipcMain.handle('delete-speech-model', async (_event, model) => {
     if (activeSession || activeMeetingCapture || meetingStarting || meetingProcessing || dictationRecovery) {
       throw new Error('Finish dictation before deleting speech models.');

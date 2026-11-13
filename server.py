@@ -3,6 +3,7 @@ import os
 import sys
 import wave
 import asyncio
+from typing import Optional
 import numpy as np
 import av
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
@@ -69,12 +70,13 @@ class ModelRequest(BaseModel):
 
 class ImportRequest(BaseModel):
     url: str
+    token: Optional[str] = None
 
 
 @app.post("/v1/models/import", status_code=202)
 def import_model(request: ImportRequest):
     try:
-        return model_manager.import_url(request.url)
+        return model_manager.import_url(request.url, token=request.token)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 

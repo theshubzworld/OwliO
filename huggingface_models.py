@@ -6,6 +6,20 @@ from urllib.parse import urlsplit
 from huggingface_hub import HfApi, hf_hub_download, snapshot_download
 
 REPO_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}/[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$")
+TOKEN_PATTERN = re.compile(r"^hf_[A-Za-z0-9]+$")
+
+
+def normalize_token(value):
+    if value is None:
+        return None
+    if not isinstance(value, str) or len(value) > 512:
+        raise ValueError("Enter a Hugging Face read token beginning with hf_.")
+    token = value.strip()
+    if not token:
+        return None
+    if not TOKEN_PATTERN.fullmatch(token):
+        raise ValueError("Enter a Hugging Face read token beginning with hf_.")
+    return token
 
 
 def repository_from_url(value):
@@ -24,9 +38,10 @@ def repository_from_url(value):
     return value
 
 
-def inspect_repository(repo, cache_dir):
-    info = HfApi().model_info(repo, files_metadata=True)
-    config_path = hf_hub_download(repo, "config.json", revision=info.sha, cache_dir=cache_dir)
+def inspect_repository(repo, cache_dir, token=None):
+    token_kwargs = {"token": token} if token else {}
+    info = HfApi(**token_kwargs).model_info(repo, files_metadata=True)
+    config_path = hf_hub_download(repo, "config.json", revision=info.sha, cache_dir=cache_dir, **token_kwargs)
     config = json.loads(Path(config_path).read_text(encoding="utf-8"))
     siblings = {file.rfilename: file for file in info.siblings}
     if "model.bin" in siblings and config.get("model_type") in (None, "Whisper", "whisper"):
@@ -36,7 +51,7 @@ def inspect_repository(repo, cache_dir):
         if "model.safetensors" in siblings:
             weights = ["model.safetensors"]
         elif "model.safetensors.index.json" in siblings:
-            index_path = hf_hub_download(repo, "model.safetensors.index.json", revision=info.sha, cache_dir=cache_dir)
+            index_path = hf_hub_download(repo, "model.safetensors.index.json", revision=info.sha, cache_dir=cache_dir, **token_kwargs)
             index = json.loads(Path(index_path).read_text(encoding="utf-8"))
             weights = sorted(set(index.get("weight_map", {}).values()))
             if not weights or any(not isinstance(file, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+\.safetensors", file) for file in weights):
@@ -65,6 +80,7 @@ def inspect_repository(repo, cache_dir):
             "engine": engine, "files": required, "bytes": sum(siblings[file].size or 0 for file in weights)}
 
 
-def download_repository(entry, cache_dir):
+def download_repository(entry, cache_dir, token=None):
+    token_kwargs = {"token": token} if token else {}
     return snapshot_download(entry["repository"], revision=entry["revision"], cache_dir=cache_dir,
-                             allow_patterns=entry["files"], max_workers=2)
+                             allow_patterns=entry["files"], max_workers=2, **token_kwargs)

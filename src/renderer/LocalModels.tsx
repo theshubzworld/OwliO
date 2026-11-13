@@ -24,6 +24,7 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
   const [message, setMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [modelUrl, setModelUrl] = useState('');
+  const [importToken, setImportToken] = useState('');
   const mounted = useRef(false);
   const refresh = async (manual = false) => {
     if (manual) { setRefreshing(true); setError(''); setMessage(''); }
@@ -81,8 +82,9 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
   const importModel = async () => {
     setBusy('import'); setError(''); setMessage('');
     try {
-      const job = await (window as any).api.importSpeechModel(modelUrl);
+      const job = await (window as any).api.importSpeechModel(modelUrl, importToken.trim() || undefined);
       if (mounted.current) {
+        setImportToken('');
         setMessage('Checking the repository and downloading its speech model. Choose it when the download finishes, then Save settings.');
         await refresh();
         // Selection is available once the repository has passed the server's compatibility check.
@@ -161,6 +163,8 @@ export function LocalModels({ settings, onSettingsChange, section = 'both' }: { 
         <label htmlFor="huggingface-model-url" className="muted">Custom Hugging Face model URL</label>
         <div className="model-actions"><input id="huggingface-model-url" className="input" type="text" value={modelUrl} onChange={event => setModelUrl(event.target.value)} placeholder="https://huggingface.co/owner/speech-model" spellCheck={false} />
           <button className="btn btn-secondary" disabled={Boolean(busy) || running || !modelUrl.trim()} onClick={() => void importModel()}>{busy === 'import' ? <Loader2 size={15} className="pill-spinner" /> : <Download size={15} />}Download URL</button></div>
+        <label htmlFor="huggingface-model-token" className="muted" style={{ display: 'block' }}>Hugging Face API token (optional, for private models)</label>
+        <div className="model-actions"><input id="huggingface-model-token" className="input" type="password" value={importToken} onChange={event => setImportToken(event.target.value)} autoComplete="off" spellCheck={false} placeholder="hf_…" /></div>
         <p className="muted"><strong>Supported models:</strong> Whisper and Transformers Parakeet TDT checkpoints, including Bark Pro. Other architectures need an additional backend.</p>
         <p className="muted"><strong>Setup:</strong> Full Whisper and Parakeet models need a Full speech package. Choose Set up model when additional libraries are needed.</p>
         <p className="muted"><strong>Access:</strong> Flex requires Hugging Face approval to download. Downloaded models run offline.</p>

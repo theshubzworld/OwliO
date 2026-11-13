@@ -43,10 +43,11 @@ def cached_flex(cache_dir):
     return str(directory)
 
 
-def download_flex(cache_dir):
+def download_flex(cache_dir, token=None):
     # The model-specific Python loader is bundled and reviewed, never downloaded or executed from a custom URL.
     directory = flex_directory(cache_dir)
-    snapshot_download(FLEX_REPO, revision=FLEX_REVISION, local_dir=str(directory), allow_patterns=list(FLEX_FILES))
+    token_kwargs = {'token': token} if token else {}
+    snapshot_download(FLEX_REPO, revision=FLEX_REVISION, local_dir=str(directory), allow_patterns=list(FLEX_FILES), **token_kwargs)
     temporary = directory/'source.tmp'
     temporary.write_text(json.dumps({'repository': FLEX_REPO, 'revision': FLEX_REVISION}), encoding='utf-8')
     temporary.replace(directory/'source.json')

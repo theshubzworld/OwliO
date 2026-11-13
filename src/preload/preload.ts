@@ -99,7 +99,7 @@ contextBridge.exposeInMainWorld('api', {
   copyText: (text: string) => ipcRenderer.invoke('copy-text', text),
   getLocalModels: () => ipcRenderer.invoke('get-local-models'),
   speechModelAction: (model: string, action: 'download' | 'activate') => ipcRenderer.invoke('speech-model-action', model, action),
-  importSpeechModel: (url: string) => ipcRenderer.invoke('import-speech-model', url),
+  importSpeechModel: (url: string, token?: string) => ipcRenderer.invoke('import-speech-model', url, token),
   deleteSpeechModel: (model: string) => ipcRenderer.invoke('delete-speech-model', model),
   pullFormattingModel: (model: string) => ipcRenderer.invoke('pull-formatting-model', model),
   onDictationUpdated: (callback: () => void) => {

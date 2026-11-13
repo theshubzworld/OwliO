@@ -1,5 +1,15 @@
 const builtins = new Set(['tiny', 'base', 'small', 'medium', 'large-v3', 'turbo', 'bodhan-flex', 'bark-pro']);
 const repoPattern = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\/[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/;
+const tokenPattern = /^hf_[A-Za-z0-9]+$/;
+
+export function huggingFaceToken(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string' || value.length > 512) throw new Error('Enter a Hugging Face read token beginning with hf_.');
+  const token = value.trim();
+  if (!token) return undefined;
+  if (!tokenPattern.test(token)) throw new Error('Enter a Hugging Face read token beginning with hf_.');
+  return token;
+}
 
 export function speechModelLabel(model: string): string {
   if(model==='bark-pro'||model.toLowerCase()==='hf:conwayresearch/underdog-bark-3.0-pro')return 'Underdog Bark 3.0 Pro';

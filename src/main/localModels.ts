@@ -1,5 +1,5 @@
 import { store } from './store';
-import { huggingFaceRepository, speechModelId } from '../shared/speechModels';
+import { huggingFaceRepository, huggingFaceToken, speechModelId } from '../shared/speechModels';
 
 const pulls = new Map<string, { id: string; model: string; status: string; state: string; error?: string; completed?: number; total?: number }>();
 
@@ -41,8 +41,10 @@ export async function deleteSpeechModel(model: unknown) {
   const id = speechModelId(val);
   return jsonRequest(speechUrl() + '/delete', { model: id });
 }
-export async function importSpeechModel(url: unknown) {
-  return jsonRequest(speechUrl() + '/import', { url: huggingFaceRepository(url) });
+export async function importSpeechModel(url: unknown, token?: unknown) {
+  const cleanToken = huggingFaceToken(token);
+  const body = cleanToken ? { url: huggingFaceRepository(url), token: cleanToken } : { url: huggingFaceRepository(url) };
+  return jsonRequest(speechUrl() + '/import', body);
 }
 export function pullFormattingModel(model: string) {
   if (typeof model !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,149}$/.test(model)) throw new Error('Enter a valid Ollama model name.');

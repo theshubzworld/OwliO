@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from faster_whisper import WhisperModel, utils
 from faster_whisper.tokenizer import _LANGUAGE_CODES
 from huggingface_hub import try_to_load_from_cache
-from huggingface_models import repository_from_url, inspect_repository, download_repository
+from huggingface_models import repository_from_url, normalize_token, inspect_repository, download_repository
 from flex_backend import FLEX_LANGUAGE_CODES, FLEX_ID, FLEX_REPO, cached_flex, download_flex, flex_directory
 from speech_backends import BUILTIN_MODELS, runtime_error, load_engine
 
@@ -249,8 +249,9 @@ class ModelManager:
                                  "compute_type": getattr(getattr(engine, "model", None), "compute_type", None)}
             return engine
 
-    def start_job(self, name, action):
+    def start_job(self, name, action, token=None):
         name = self.normalize(name)
+        token = normalize_token(token)
         if action not in ("download", "activate"):
             raise ValueError("Unsupported model action")
         if action == "activate" and not self.cached_path(name):
@@ -266,20 +267,23 @@ class ModelManager:
             self._jobs[job["id"]] = job
             while len(self._jobs) > 20:
                 self._jobs.pop(next(iter(self._jobs)))
-            self._executor.submit(self._run_job, job)
+            args = (job, token) if token else (job,)
+            self._executor.submit(self._run_job, *args)
             return dict(job)
 
-    def import_url(self, url):
+    def import_url(self, url, token=None):
         repo = repository_from_url(url)
+        token = normalize_token(token)
+        token_kwargs = {"token": token} if token else {}
         if repo == FLEX_REPO:
-            return self.start_job(FLEX_ID, 'download')
+            return self.start_job(FLEX_ID, 'download', **token_kwargs)
         for name, entry in BUILTIN_MODELS.items():
             if repo.lower() == entry['repository'].lower():
-                return self.start_job(name, 'download')
+                return self.start_job(name, 'download', **token_kwargs)
         name = "hf:" + repo
         with self._lock:
             if name in self._custom:
-                return self.start_job(name, "download")
+                return self.start_job(name, "download", **token_kwargs)
             for job in self._jobs.values():
                 if job["status"] in ("queued", "inspecting", "downloading", "loading"):
                     if job["model"] == name:
@@ -289,52 +293,59 @@ class ModelManager:
             self._jobs[job["id"]] = job
             while len(self._jobs) > 20:
                 self._jobs.pop(next(iter(self._jobs)))
-            self._executor.submit(self._import_job, job, repo)
+            args = (job, repo, token) if token else (job, repo)
+            self._executor.submit(self._import_job, *args)
             return dict(job)
 
-    def _import_job(self, job, repo):
+    def _import_job(self, job, repo, token=None):
         try:
             with self._lock:
                 job["status"] = "inspecting"
-            entry = inspect_repository(repo, self.cache_dir)
+            token_kwargs = {"token": token} if token else {}
+            entry = inspect_repository(repo, self.cache_dir, **token_kwargs)
             with self._lock:
                 self._custom[entry["id"]] = entry
                 self._registry_path.parent.mkdir(parents=True, exist_ok=True)
                 temporary = self._registry_path.with_suffix(".tmp")
                 temporary.write_text(json.dumps(list(self._custom.values()), indent=2), encoding="utf-8")
                 temporary.replace(self._registry_path)
-            self._run_job(job)
+            self._run_job(job, **token_kwargs)
         except Exception as error:
+            message = str(error).replace(token, "[redacted]") if token else str(error)
             with self._lock:
-                job.update(status="failed", error=str(error))
+                job.update(status="failed", error=message)
 
-    def download(self, name):
+    def download(self, name, token=None):
         """Shared setup/background path for every supported architecture."""
         name = self.normalize(name)
+        token = normalize_token(token)
         if not self.cached_path(name):
+            token_kwargs = {"token": token} if token else {}
             if name == FLEX_ID:
-                download_flex(self.cache_dir)
+                download_flex(self.cache_dir, **token_kwargs)
             elif name in self._custom or name in BUILTIN_MODELS:
-                download_repository(BUILTIN_MODELS.get(name) or self._custom[name], self.cache_dir)
+                download_repository(BUILTIN_MODELS.get(name) or self._custom[name], self.cache_dir, **token_kwargs)
             else:
                 utils.download_model(MODEL_REPOS[name], cache_dir=self.cache_dir)
         if not self.cached_path(name):
             raise RuntimeError('Download did not produce a complete model. Please retry.')
 
-    def _run_job(self, job):
+    def _run_job(self, job, token=None):
         try:
             with self._lock:
                 job["status"] = "downloading" if job["action"] == "download" else "loading"
             if job["action"] == "download":
-                self.download(job['model'])
+                token_kwargs = {"token": token} if token else {}
+                self.download(job['model'], **token_kwargs)
             else:
                 self.load(job["model"])
             with self._lock:
                 job["status"] = "ready"
         except Exception as error:
+            message = str(error).replace(token, "[redacted]") if token else str(error)
             with self._lock:
                 job["status"] = "failed"
-                job["error"] = str(error)
+                job["error"] = message
 
     def close(self):
         self._executor.shutdown(wait=True)
